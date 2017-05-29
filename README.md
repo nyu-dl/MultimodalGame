@@ -65,3 +65,5 @@ EXPERIMENT_NAME="demo"; \
     -binary_output ./logs/${EXPERIMENT_NAME}.bv.hdf5 \ # save messages as an hdf5
     -fixed_exchange # use `fixed_exchange` since the adaptive length can be determined with the stop bits
 ```
+
+We've included a notebook with a couple examples for how you might want to analyse the binary messages [here](https://github.com/nyu-dl/MultimodalGame/blob/master/analyse_communication.ipynb).

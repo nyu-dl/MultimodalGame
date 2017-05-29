@@ -1,0 +1,8 @@
+utils/downloaded
+*.hdf5
+bin_vec
+conf_mat
+logs
+*.pyc
+urls
+.ipynb_checkpoints

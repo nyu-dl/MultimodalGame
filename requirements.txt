@@ -1,0 +1,7 @@
+h5py
+nltk
+numpy
+parse
+python-gflags
+sklearn
+tqdm

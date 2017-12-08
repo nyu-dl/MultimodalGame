@@ -1,6 +1,6 @@
 # MultimodalGame
 
-Source code for [Emergent Language in a Multi-Modal, Multi-Step Referential Game](https://arxiv.org/abs/1705.10369).
+Source code for [Emergent Communication in a Multi-Modal, Multi-Step Referential Game](https://arxiv.org/abs/1705.10369).
 
 ## Dependencies
 

@@ -151,6 +151,9 @@ def cmd_urls():
     # read urls
     with open(FLAGS.load_imagenet_path) as f:
         for ii, line in enumerate(f):
+            if ii > 2800000:
+                # Fix for lines in file that crashes everything
+                break
             try:
                 line = line.strip()
                 _synset, _url = line.split('\t')

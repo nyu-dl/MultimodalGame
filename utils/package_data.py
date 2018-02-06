@@ -43,7 +43,7 @@ from torch.autograd import Variable
 import torchvision.models as models
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
-
+from torch.nn import AvgPool2d
 import numpy as np
 import h5py
 from tqdm import tqdm
@@ -114,18 +114,24 @@ class FeatureModel(nn.Module):
             raise NotImplementedError()
 
         layers += [
-            (model.avgpool, 'avgpool'),
+            #(model.avgpool, 'avgpool'),
+            # avgpool fix to get to original specifid dimensions - perhaps ResNet spec changed? 
+            (AvgPool2d(kernel_size=8, stride=1, padding=0, ceil_mode=False, count_include_pad=True), 'avgpool'),
             (lambda x: x.view(x.size(0), -1), 'avgpool_512'),
             (model.fc, 'fc'),
         ]
 
         for module, name in layers:
+            #print(f'name: {name}\n module: {module}')
+            #print(f'x shape before: {x.size()}')
             x = module(x)
+            #print(f'x shape after: {x.size()}')
             # print(" N", x.data.numel())
             # print("<0", (x.data < 0.).sum())
             # print("=0", (x.data == 0.).sum())
             # print("{} - {}".format(name, tuple(x.size())))
             if name in request:
+                #print(f'{name} in request, appending...')
                 ret.append(x)
 
         return ret
@@ -170,7 +176,7 @@ def run():
     # Load dataset and transform
     dataset = dset.ImageFolder(root=FLAGS.load_imgs,
                                transform=transforms.Compose([
-                               transforms.Scale(227),
+                               transforms.Resize(227),
                                transforms.CenterCrop(227),
                                transforms.ToTensor(),
                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -209,7 +215,11 @@ def run():
 
     for i, img in tqdm(enumerate(data_it(dataloader))):
         tensor, target = img
-
+        if i == 0:
+            print('')
+            print(tensor.size())
+            print(request)
+            print(target)
         if FLAGS.cuda:
             tensor = tensor.cuda()
         outp = model(Variable(tensor), request)
@@ -237,7 +247,11 @@ def run():
     # Save hdf5 file
     hdf5_f = h5py.File(FLAGS.save_hdf5, 'w')
     hdf5_f.create_dataset("Target", data=np.array(targets))
-    hdf5_f.create_dataset("Location", data=np.array(locations))
+    # Location format not saveable to hdf5
+    #dt = np.dtype(str)
+    #locations = np.array(locations).astype(dt)
+    #hdf5_f.create_dataset("Location", (len(locations),), dtype=str)
+    #hdf5_f.create_dataset("Location", data=locations))
     for r in request:
         hdf5_f.create_dataset(r, data=np.array(other[r]))
     hdf5_f.close()

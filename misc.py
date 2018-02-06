@@ -263,7 +263,7 @@ def load_hdf5(hdf5_file, batch_size, random_seed, shuffle, truncate_final_batch=
     target = f["Target"]
     dataset_size = target.shape[0]
     f.close()
-    order = range(dataset_size)
+    order = list(range(dataset_size))
 
     # Shuffle
     if shuffle:
@@ -287,8 +287,9 @@ def load_hdf5(hdf5_file, batch_size, random_seed, shuffle, truncate_final_batch=
 
         # TODO: We probably need to map the label_ids some way.
         batch['target'] = torch.LongTensor(
-            map(map_labels, f["Target"][batch_indices]))
-        batch['example_ids'] = f["Location"][batch_indices]
+            list(map(map_labels, f["Target"][batch_indices])))
+        # Location format broken in hdf5 in python 3
+        #batch['example_ids'] = f["Location"][batch_indices]
 
         batch['layer4_2'] = torch.from_numpy(
             f["layer4_2"][batch_indices]).float().squeeze()
@@ -323,7 +324,7 @@ def embed(word_dict, emb):
 # Function computing CBOW for each description
 def cbow(descr, word_dict):
     # TODO: Faster summing please!
-    emb_size = len(word_dict.values()[0]["emb"])
+    emb_size = len(list(word_dict.values())[0]["emb"])
     for mammal in descr:
         num_w = 0
         desc_len = len(descr[mammal]["desc"])

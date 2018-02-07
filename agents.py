@@ -167,7 +167,7 @@ class MessageProcessor(nn.Module):
 
 class MessageGenerator(nn.Module):
     '''Generates a message for an agent
-    MAKE RECURRENT?'''
+    TODO MAKE RECURRENT? - later'''
 
     def __init__(self, m_dim, hid_dim, use_binary):
         super(MessageGenerator, self).__init__()
@@ -367,7 +367,7 @@ class Agent(nn.Module):
         debuglogger.debug(f'h_z: {self.h_z.size()}')
 
         # Process the image
-        h_i = self.image_processor(x, m, t)
+        h_i = self.image_processor(x, self.h_z, t)
         debuglogger.debug(f'h_i: {h_i.size()}')
 
         # Combine the image and message info to a single vector

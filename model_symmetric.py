@@ -318,7 +318,7 @@ def exchange(agent1, agent2, exchange_args):
         s_1e, m_1e, y_1e, r_1e = agent_1(
             Variable(data['im_feats_1'], volatile=not train),
             Variable(m_binary.data, volatile=not train),
-            i,
+            0,
             Variable(desc.data, volatile=not train),
             use_message,
             batch_size,
@@ -327,7 +327,7 @@ def exchange(agent1, agent2, exchange_args):
         s_2e, m_2e, y_2e, r_2e = agent_2(
             Variable(data['im_feats_2'], volatile=not train),
             Variable(m_binary.data, volatile=not train),
-            i,
+            0,
             Variable(desc.data, volatile=not train),
             use_message,
             batch_size,
@@ -357,7 +357,7 @@ def exchange(agent1, agent2, exchange_args):
             s_2e, m_2e, y_2e, r_2e = agent_2(
                 Variable(data['im_feats_2'], volatile=not train),
                 Variable(m_1e_binary.data, volatile=not train),
-                i,
+                i_exchange,
                 Variable(desc.data, volatile=not train),
                 use_message,
                 batch_size,
@@ -377,7 +377,7 @@ def exchange(agent1, agent2, exchange_args):
             s_1e, m_1e, y_1e, r_1e = agent_1(
                 Variable(data['im_feats_1'], volatile=not train),
                 Variable(m_2e_binary.data, volatile=not train),
-                i,
+                i_exchange,
                 Variable(desc.data, volatile=not train),
                 use_message,
                 batch_size,
@@ -398,6 +398,7 @@ def exchange(agent1, agent2, exchange_args):
         m_binary_2, m_probs_2 = m_2e
 
         # Save for later
+        # TODO check stop mask
         stop_mask_1.append(torch.min(stop_mask[-1], s_binary_1.byte()))
         stop_mask_2.append(torch.min(stop_mask[-1], s_binary_2.byte()))
         stop_feat_1.append(s_binary_1)
@@ -468,7 +469,7 @@ def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
         torch.log(1 - binary_probs + 1e-8)
     log_p_z = log_p_z.sum(1)
     weight = Variable(rewards.data) - Variable(baseline_rewards.clone().detach().data)
-    if logs.size(0) > 1:
+    if logs.size(0) > 1:  # TODO - check if this is needed
         weight = weight / np.maximum(1., torch.std(weight.data))
     loss = torch.mean(-1 * weight * log_p_z)
 

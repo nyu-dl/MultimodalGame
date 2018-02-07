@@ -145,19 +145,18 @@ class TextProcessor(nn.Module):
 class MessageProcessor(nn.Module):
     '''Processes a received message from an agent'''
 
-    def __init__(self, m_dim, hid_dim, use_message):
+    def __init__(self, m_dim, hid_dim):
         super(MessageProcessor, self).__init__()
         self.m_dim = m_dim
         self.hid_dim = hid_dim
-        self.use_message = use_message
         self.rnn = nn.GRUCell(self.m_dim, self.hid_dim)
         self.reset_parameters()
 
     def reset_parameters(self):
         reset_parameters_util(self)
 
-    def forward(self, m, h):
-        if self.use_message:
+    def forward(self, m, h, use_message):
+        if use_message:
             debuglogger.debug(f'Using message')
             return self.rnn(m, h)
         else:
@@ -255,7 +254,6 @@ class Agent(nn.Module):
                  num_classes,
                  s_dim,
                  use_binary,
-                 use_message,
                  use_attn,
                  attn_dim):
         super(Agent, self).__init__()
@@ -267,13 +265,12 @@ class Agent(nn.Module):
         self.num_classes = num_classes
         self.s_dim = s_dim
         self.use_binary = use_binary
-        self.use_message = use_message
         self.use_attn = use_attn
         self.attn_dim = attn_dim
         self.image_processor = ImageProcessor(
             im_feat_dim, h_dim, use_attn, attn_dim)
         self.text_processor = TextProcessor(desc_dim, h_dim)
-        self.message_processor = MessageProcessor(m_dim, h_dim, use_message)
+        self.message_processor = MessageProcessor(m_dim, h_dim)
         self.message_generator = MessageGenerator(m_dim, h_dim, use_binary)
         self.reward_estimator = RewardEstimator(h_dim)
         # Network for combining processed image and message representations
@@ -310,7 +307,7 @@ class Agent(nn.Module):
     def initial_state(self, batch_size):
         return _Variable(torch.zeros(batch_size, self.h_dim))
 
-    def forward(self, x, m, t, desc, batch_size, training):
+    def forward(self, x, m, t, desc, use_message, batch_size, training):
         """
         Update State:
             h_z = message_processor(m, h_z)
@@ -346,7 +343,6 @@ class Agent(nn.Module):
         Args:
             x: Image features.
             m: communication from other agent
-            g: (attention) Image features used as query in attention.
             t: (attention) Timestep. Used to change attention equation in first iteration.
             desc: List of description vectors used in communication and predictions.
             batch_size: size of batch
@@ -367,7 +363,7 @@ class Agent(nn.Module):
             self.h_z = self.initial_state(batch_size)
 
         # Process message sent from the other agent
-        self.h_z = self.message_processor(m, self.h_z)
+        self.h_z = self.message_processor(m, self.h_z, use_message)
         debuglogger.debug(f'h_z: {self.h_z.size()}')
 
         # Process the image
@@ -461,7 +457,6 @@ if __name__ == "__main__":
                   num_classes,
                   s_dim,
                   use_binary,
-                  use_message,
                   use_attn,
                   attn_dim)
     print(agent)
@@ -470,7 +465,7 @@ if __name__ == "__main__":
     desc = _Variable(torch.ones(batch_size, num_classes, desc_dim))
 
     for i in range(2):
-        s, w, y, r = agent(x, m, i, desc, batch_size, training)
+        s, w, y, r = agent(x, m, i, desc, use_message, batch_size, training)
         print(f's_binary: {s[0]}')
         print(f's_probs: {s[1]}')
         print(f'w_binary: {w[0]}')

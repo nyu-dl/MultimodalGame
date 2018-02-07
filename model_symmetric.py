@@ -224,162 +224,216 @@ def eval_dev(dev_file, batch_size, epoch, shuffle, cuda, top_k,
     return correct / total, extra
 
 
-def exchange(sender, receiver, baseline_sen, baseline_rec, exchange_args):
-    """Run a batched conversation between Sender and Receiver.
+def corrupt_message(corrupt_region, agent, binary_message):
+    # Obtain mask
+    mask = Variable(build_mask(corrupt_region, agent.m_dim))
+    mask_broadcast = mask.view(1, agent_1.m_dim).expand_as(binary_message)
+    # Subtract the mask to change values, but need to get absolute value
+    # to set -1 values to 1 to essentially "flip" all the bits.
+    binary_message = (binary_message - mask_broadcast).abs()
+    return binary_message
 
-    The Sender has only the image, and the Receiver has descriptions of each of the image's
-    possible classes and a history of each message it has sent and received.
 
-    The Receiver begins the conversation by sending a query of Os. The Sender inspects this query
-    and the image, then formulates a response. The Receiver inspects the response and its set of
-    descriptions, then formulates a new query. The conversation continues this way until it has
-    reached some predetermined length, or the Receiver has decided it has processed a sufficient
-    amount of information at which point it ignores all future conversation. When each Receiver
-    in the batch has received sufficient information, then the batched conversation may terminate
-    early.
+def exchange(agent1, agent2, exchange_args):
+    """Run a batched conversation between two agents.
+
+    # TODO - explain
 
     Exchange Args:
-        data: Image features.
-        data_context: Optional additional image features that can be used as query in visual attention.
+        data: Image features
+            - dict containing the image features for agent 1 and agent 2, and the percentage of the
+              image each agent received
+              e.g.  { "im_feats_1": im_feats_1,
+                      "im_feats_2": im_feats_2,
+                      "p_1": p_1,
+                      "p_2": p_2}
         target: Class labels.
         desc: List of description vectors.
         train: Boolean value indicating training mode (True) or evaluation mode (False).
-        break_early: Boolean value. If True, then terminate batched conversation if all Receivers are satisfied.
+        break_early: Boolean value. If True, then terminate batched conversation if both agents are satisfied
     Args:
-        sender: Agent 1. The Sender.
-        receiver: Agent 2. The Receiver.
-        baseline_sen: Baseline network for Sender.
-        baseline_rec: Baseline network for Receiver.
+        agent1: agent1
+        agent2: agent2
         exchange_args: Other useful arguments.
     Output:
         s: All STOP bits. (Masks, Values, Probabilities)
-        sen_w: All sender messages. (Values, Probabilities)
-        rec_w: All receiver messages. (Values, Probabilities)
-        y: All predictions that were made.
-        bs: Estimated loss of sender.
-        br: Estimated loss of receiver.
+        w_1: All agent_1 messages. (Values, Probabilities)
+        w_2: All agent_2 messages. (Values, Probabilities)
+        y_1: All predictions that were made by agent 1 (Before comms, after comms)
+        y_2: All predictions that were made by agent 2 (Before comms, after comms)
+        r_1: Estimated rewards of agent_1.
+        r_2: Estimated rewards of agent_2.
     """
 
     data = exchange_args["data"]
-    data_context = exchange_args.get("data_context", None)
+    data_context = None
     target = exchange_args["target"]
     desc = exchange_args["desc"]
-    desc_set = exchange_args.get("desc_set", None)
-    desc_set_lens = exchange_args.get("desc_set_lens", None)
     train = exchange_args["train"]
     break_early = exchange_args.get("break_early", False)
     corrupt = exchange_args.get("corrupt", False)
     corrupt_region = exchange_args.get("corrupt_region", None)
 
-    batch_size = data.size(0)
+    batch_size = data["im_feats_1"].size(0)
 
     # Pad with one column of ones.
-    stop_mask = [Variable(torch.ones(batch_size, 1).byte())]
-    stop_feat = []
-    stop_prob = []
-    sen_feats = []
-    sen_probs = []
-    rec_feats = []
-    rec_probs = []
-    y = []
-    bs = []
-    br = []
+    stop_mask_1 = [Variable(torch.ones(batch_size, 1).byte())]
+    stop_feat_1 = []
+    stop_prob_1 = []
+    stop_mask_1 = [Variable(torch.ones(batch_size, 1).byte())]
+    stop_feat_1 = []
+    stop_prob_1 = []
+    feats_1 = []
+    probs_1 = []
+    feats_2 = []
+    probs_2 = []
+    y_1_nc = None
+    y_2_nc = None
+    y_1 = []
+    y_2 = []
+    r_1 = []
+    r_2 = []
 
-    w_binary = Variable(torch.FloatTensor(batch_size, sender.w_dim).fill_(
-        FLAGS.first_rec), volatile=not train)
+    # First message
+    m_binary = Variable(torch.FloatTensor(batch_size, agent_1.m_dim).fill_(
+        FLAGS.first_msg), volatile=not train)
 
     if train:
-        sender.train()
-        receiver.train()
-        baseline_sen.train()
-        baseline_rec.train()
+        agent_1.train()
+        agent_2.train()
     else:
-        sender.eval()
-        receiver.eval()
+        agent_1.eval()
+        agent_2.eval()
 
-    sender.reset_state()  # only for debugging/performance
-    receiver.reset_state()
+    agent_1.reset_state()
+    agent_2.reset_state()
+
+    # The message is ignored initially
+    use_message = False
+    # Run data through both agents
+    # No data context at the moment - # TODO
+    if data_context is not None:
+        pass
+    else:
+        s_1e, m_1e, y_1e, r_1e = agent_1(
+            Variable(data['im_feats_1'], volatile=not train),
+            Variable(m_binary.data, volatile=not train),
+            i,
+            Variable(desc.data, volatile=not train),
+            use_message,
+            batch_size,
+            train)
+
+        s_2e, m_2e, y_2e, r_2e = agent_2(
+            Variable(data['im_feats_2'], volatile=not train),
+            Variable(m_binary.data, volatile=not train),
+            i,
+            Variable(desc.data, volatile=not train),
+            use_message,
+            batch_size,
+            train)
+
+    # Add no message selections to results
+    y_1_nc = y_1e
+    y_2_nc = y_2e
 
     for i_exchange in range(FLAGS.max_exchange):
         debuglogger.info(
             f' ================== EXCHANGE {i_exchange} ====================')
-        z_r = w_binary  # rename variable to z_r which makes more sense
+        # The messages are now used
+        use_message = True
 
-        # Run data through Sender
-        if data_context is not None:
-            z_binary, z_probs = sender(Variable(data, volatile=not train), Variable(z_r.data, volatile=not train),
-                                       Variable(data_context, volatile=not train), i_exchange)
-        else:
-            z_binary, z_probs = sender(Variable(data, volatile=not train), Variable(z_r.data, volatile=not train),
-                                       None, i_exchange)
+        # Agent 1's message
+        m_1e_binary, m_1e_probs = m_1e
 
-        # Optionally corrupt Sender's message
+        # Optionally corrupt agent 1's message
         if corrupt:
-            # Obtain mask
-            mask = Variable(build_mask(corrupt_region, sender.w_dim))
-            mask_broadcast = mask.view(1, sender.w_dim).expand_as(z_binary)
-            # Subtract the mask to change values, but need to get absolute value
-            # to set -1 values to 1 to essentially "flip" all the bits.
-            z_binary = (z_binary - mask_broadcast).abs()
+            m_1e_binary = corrupt_message(corrupt_region, agent1, m_1e_binary)
 
-        # Generate input for Receiver
-        z_s = z_binary  # rename variable to z_s which makes more sense
+        # Run data through agent 2
+        if data_context is not None:
+            pass
+        else:
+            s_2e, m_2e, y_2e, r_2e = agent_2(
+                Variable(data['im_feats_2'], volatile=not train),
+                Variable(m_1e_binary.data, volatile=not train),
+                i,
+                Variable(desc.data, volatile=not train),
+                use_message,
+                batch_size,
+                train)
 
-        # Run batch through Receiver
-        (s_binary, s_prob), (w_binary, w_probs), outp = receiver(
-            Variable(z_s.data, volatile=not train), Variable(
-                desc.data, volatile=not train),
-            desc_set, desc_set_lens)
+        # Agent 2's message
+        m_2e_binary, m_2e_probs = m_2e
 
-        if train:
-            sen_h_x = sender.h_x
+        # Optionally corrupt agent 2's message
+        if corrupt:
+            m_2e_binary = corrupt_message(corrupt_region, agent2, m_2e_binary)
 
-            # Score from Baseline (Sender)
-            baseline_sen_scores = baseline_sen(
-                Variable(sen_h_x.data), Variable(z_r.data), None)
+        # Run data through agent 1
+        if data_context is not None:
+            pass
+        else:
+            s_1e, m_1e, y_1e, r_1e = agent_1(
+                Variable(data['im_feats_1'], volatile=not train),
+                Variable(m_2e_binary.data, volatile=not train),
+                i,
+                Variable(desc.data, volatile=not train),
+                use_message,
+                batch_size,
+                train)
 
-            rec_h_z = receiver.h_z if receiver.h_z is not None else receiver.initial_state(
-                batch_size)
+        # TODO - check Not used
+        # # Obtain predictions agent 1
+        # dist_1 = F.log_softmax(y_1e, dim=1)
+        # maxdist_1, argmax_1 = dist.data.max(1)
+        #
+        # # Obtain predictions agent 2
+        # dist_2 = F.log_softmax(y_2e, dim=1)
+        # maxdist_2, argmax_2 = dist.data.max(1)
 
-            # Score from Baseline (Receiver)
-            baseline_rec_scores = baseline_rec(
-                None, Variable(z_s.data), Variable(rec_h_z.data))
-
-        outp = outp.view(batch_size, -1)
-
-        # Obtain predictions
-        dist = F.log_softmax(outp, dim=1)
-        maxdist, argmax = dist.data.max(1)
+        s_binary_1, s_prob_1 = s_1e
+        s_binary_2, s_prob_2 = s_2e
+        m_binary_1, m_probs_1 = m_1e
+        m_binary_2, m_probs_2 = m_2e
 
         # Save for later
-        stop_mask.append(torch.min(stop_mask[-1], s_binary.byte()))
-        stop_feat.append(s_binary)
-        stop_prob.append(s_prob)
-        sen_feats.append(z_binary)
-        sen_probs.append(z_probs)
-        rec_feats.append(w_binary)
-        rec_probs.append(w_probs)
-        y.append(outp)
-
-        if train:
-            br.append(baseline_rec_scores)
-            bs.append(baseline_sen_scores)
+        stop_mask_1.append(torch.min(stop_mask[-1], s_binary_1.byte()))
+        stop_mask_2.append(torch.min(stop_mask[-1], s_binary_2.byte()))
+        stop_feat_1.append(s_binary_1)
+        stop_feat_2.append(s_binary_2)
+        stop_prob_1.append(s_prob_1)
+        stop_prob_2.append(s_prob_2)
+        feats_1.append(s_binary_1)
+        feats_2.append(s_binary_2)
+        probs_1.append(s_prob_1)
+        probs_2.append(s_prob_2)
+        y_1.append(y_1e)
+        y_2.append(y_2e)
+        r_1.append(r_1e)
+        r_2.append(r_2e)
 
         # Terminate exchange if everyone is done conversing
-        if break_early and stop_mask[-1].float().sum().data[0] == 0:
+        if break_early and stop_mask_1[-1].float().sum().data[0] == 0 and stop_mask_2[-1].float().sum().data[0] == 0:
             break
 
     # The final mask must always be zero.
-    stop_mask[-1].data.fill_(0)
+    stop_mask_1[-1].data.fill_(0)
+    stop_mask_2[-1].data.fill_(0)
 
-    s = (stop_mask, stop_feat, stop_prob)
-    sen_w = (sen_feats, sen_probs)
-    rec_w = (rec_feats, rec_probs)
+    s = [(stop_mask_1, stop_feat_1, stop_prob_1),
+         (stop_mask_1, stop_feat_1, stop_prob_1)]
+    message_1 = (feats_1, probs_1)
+    message_2 = (feats_2, probs_2)
+    y = (y_1, y_2)
+    y_nc = (y_1_nc, y_2_nc)
+    y_all = [y_nc, y]
+    r = (r_1, r_2)
 
-    return s, sen_w, rec_w, y, bs, br
+    return s, message_1, message_2, y_all, r
 
 
-def get_rec_outp(y, masks):
+def get_outp(y, masks):
     def negent(yy):
         probs = F.softmax(yy, dim=1)
         return (torch.log(probs + 1e-8) * probs).sum(1).mean()
@@ -387,8 +441,8 @@ def get_rec_outp(y, masks):
     # TODO: This is wrong for the dynamic exchange, and we might want a "per example"
     # entropy for either exchange (this version is mean across batch).
     negentropy = list(map(negent, y))
-    debuglogger.info(f'negentropy type: {type(negentropy)}')
 
+    # TODO check ok for new agents
     if masks is not None:
 
         batch_size = y[0].size(0)
@@ -408,13 +462,12 @@ def get_rec_outp(y, masks):
         return y[-1], negentropy
 
 
-def calculate_loss_binary(binary_features, binary_probs, logs, baseline_scores, entropy_penalty):
+def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewards, entropy_penalty):
     log_p_z = Variable(binary_features.data) * torch.log(binary_probs + 1e-8) + \
         (1 - Variable(binary_features.data)) * \
         torch.log(1 - binary_probs + 1e-8)
     log_p_z = log_p_z.sum(1)
-    weight = Variable(logs.data) - \
-        Variable(baseline_scores.clone().detach().data)
+    weight = Variable(rewards.data) - Variable(baseline_rewards.clone().detach().data)
     if logs.size(0) > 1:
         weight = weight / np.maximum(1., torch.std(weight.data))
     loss = torch.mean(-1 * weight * log_p_z)
@@ -430,6 +483,7 @@ def calculate_loss_binary(binary_features, binary_probs, logs, baseline_scores, 
 
 
 def multistep_loss_binary(binary_features, binary_probs, logs, baseline_scores, masks, entropy_penalty):
+    # TODO - check for new agents
     if masks is not None:
         def mapped_fn(feat, prob, scores, mask, mask_sums):
             if mask_sums == 0:
@@ -470,12 +524,13 @@ def multistep_loss_binary(binary_features, binary_probs, logs, baseline_scores, 
     return loss, entropies
 
 
-def calculate_loss_bas(baseline_scores, logs):
-    loss_bas = nn.MSELoss()(baseline_scores, Variable(logs.data))
+def calculate_loss_bas(baseline_scores, rewards):
+    loss_bas = nn.MSELoss()(baseline_scores, Variable(rewards.data))
     return loss_bas
 
 
 def multistep_loss_bas(baseline_scores, logs, masks):
+    # TODO - check for new agents
     if masks is not None:
         losses = map(lambda scores, mask: calculate_loss_bas(
             scores[mask].view(-1, 1), logs[mask].view(-1, 1)),
@@ -500,6 +555,95 @@ def bin_to_alpha(binary):
     return " ".join(ret)
 
 
+def calculate_accuracy(prediction_dist, target):
+    assert FLAGS.batch_size == target.size(0)
+    target_exp = target.view(-1, 1).expand(FLAGS.batch_size, FLAGS.top_k_train)
+    top_k_ind = torch.from_numpy(prediction_dist.data.cpu().numpy().argsort()[:, -FLAGS.top_k_train:]).long()
+    correct = (top_k_ind == target_exp.cpu()).sum(axis=1)
+    accuracy = correct.sum() / float(FLAGS.batch_size)
+    return accuracy, correct
+
+
+def log_exchange(s, message_1, message_2, log_type="Train:"):
+    # TODO - check makes sense with symmetric agents
+    log_string = log_type
+    s_masks_1, s_feats_1, s_probs_1 = s[0]
+    s_masks_2, s_feats_2, s_probs_2 = s[1]
+    feats_1, probs_1 = message_1
+    feats_2, probs_2 = message_2
+    current_exchange = len(feats_1)
+    for i_sample in range(FLAGS.exchange_samples):
+        prev_1 = torch.FloatTensor(FLAGS.m_dim).fill_(0)
+        prev_2 = torch.FloatTensor(FLAGS.m_dim).fill_(0)
+        for i_exchange in range(current_exchange):
+            probs_1_i = probs_1[i_exchange][i_sample].data.tolist(
+            )
+            spark_1 = sparks(
+                [1] + probs_1_i)[1:].encode('utf-8')
+            probs_2_i = probs_2[i_exchange][i_sample].data.tolist(
+            )
+            spark_2 = sparks(
+                [1] + probs_2_i)[1:].encode('utf-8')
+            s_probs_1_i = s_probs_1[i_exchange][i_sample].data.tolist(
+            )
+            s_spark_1 = sparks(
+                [1] + s_probs_1_i)[1:].encode('utf-8')
+
+            binary_1 = feats_1[i_exchange][i_sample].data.cpu(
+            )
+            hamming_1 = (prev_1 - binary_1).abs().sum()
+            prev_1 = binary_1
+            binary_2 = feats_2[i_exchange][i_sample].data.cpu(
+            )
+            hamming_2 = (prev_2 - binary_2).abs().sum()
+            prev_2 = binary_2
+
+            msg_1 = "".join(
+                map(str, map(int, binary_1.tolist())))
+            msg_2 = "".join(
+                map(str, map(int, binary_2.tolist())))
+            if FLAGS.use_alpha:
+                msg_1 = bin_to_alpha(msg_1)
+                msg_2 = bin_to_alpha(msg_2)
+            if i_exchange == 0:
+                log_string += "\n{:>3}".format(i_sample)
+            else:
+                log_string += "\n   "
+            log_string += "        {}".format(spark_1)
+            log_string += "           {}    {}".format(
+                s_spark_1, spark_2)
+            log_string += "\n    {:>3} S: {} {:4}".format(
+                i_exchange, msg_1, hamming_1)
+            log_string += "    s={} R: {} {:4}".format(
+                s_masks_1[1:][i_exchange][i_sample].data[0], msg_2, hamming_2)
+    log_string += "\n"
+    return log_string
+
+
+def get_classification_loss_and_stats(predictions, targets):
+    '''
+    Arguments:
+        - predictions: predicted logits for the classes
+        - targets: correct classes
+    Returns:
+        - dist: logs of the predicted probability distribution over the classes
+        - argmax: predicted class
+        - argmax_prob: predicted class probability
+        - ent: average entropy of the predicted probability distributions (over the batch)
+        - nll_loss: Negative Log Likelihood loss between the predictions and targets
+        - logs: Individual log likelihoods across the batch
+    '''
+    dist = F.log_softmax(predictions, dim=1)
+    maxdist, argmax = dist.data.max(1)
+    probs = F.softmax(predictions, dim=1)
+    ent = (torch.log(probs + 1e-8) * probs).sum(1).mean()
+    debuglogger.debug(f'Mean entropy: {ent.size()}')
+    nll_loss = nn.NLLLoss()(dist, Variable(targets))
+    logs = loglikelihood(Variable(dist.data),
+                         Variable(targets.view(-1, 1)))
+    return (dist, maxdist, argmax, ent, nll_loss, logs)
+
+
 def run():
     flogger = FileLogger(FLAGS.log_file)
     logger = Logger(
@@ -512,136 +656,62 @@ def run():
         with open(FLAGS.json_file, "w") as f:
             f.write(json.dumps(FLAGS.FlagValuesDict(), indent=4, sort_keys=True))
 
-    # Sender model
-    sender = Sender(feature_type=FLAGS.img_feat,
-                    feat_dim=FLAGS.img_feat_dim,
-                    h_dim=FLAGS.img_h_dim,
-                    w_dim=FLAGS.rec_w_dim,
-                    bin_dim_out=FLAGS.sender_out_dim,
-                    use_binary=FLAGS.use_binary,
-                    use_attn=FLAGS.visual_attn,
-                    attn_dim=FLAGS.attn_dim,
-                    attn_extra_context=FLAGS.attn_extra_context,
-                    attn_context_dim=FLAGS.attn_context_dim)
+    # Initialize Agents
+    agent1 = Agent(feature_type=FLAGS.img_feat,
+                   feat_dim=FLAGS.img_feat_dim,
+                   h_dim=FLAGS.img_h_dim,
+                   m_dim=FLAGS.m_dim,  # TODO update flag
+                   desc_dim=FLAGS.desc_dim,  # TODO update flag
+                   num_classes=FLAGS.num_classes,  # TODO update flag
+                   s_dim=1  # TODO check
+                   use_binary=FLAGS.use_binary,
+                   use_attn=FLAGS.visual_attn,
+                   attn_dim=FLAGS.attn_dim)
 
-    flogger.Log("Architecture: {}".format(sender))
+    flogger.Log("Agent 1 Architecture: {}".format(agent1))
     total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
-                        for p in sender.parameters()])
+                        for p in agent1.parameters()])
     flogger.Log("Total Parameters: {}".format(total_params))
 
-    # Baseline model
-    baseline_sen = Baseline(hid_dim=FLAGS.baseline_hid_dim,
-                            x_dim=FLAGS.img_h_dim,
-                            binary_dim=FLAGS.rec_w_dim,
-                            inp_dim=0)
+    agent2 = Agent(feature_type=FLAGS.img_feat,
+                   feat_dim=FLAGS.img_feat_dim,
+                   h_dim=FLAGS.img_h_dim,
+                   m_dim=FLAGS.m_dim,  # TODO update flag
+                   desc_dim=FLAGS.desc_dim,  # TODO update flag
+                   num_classes=FLAGS.num_classes,  # TODO update flag
+                   s_dim=1  # TODO check
+                   use_binary=FLAGS.use_binary,
+                   use_attn=FLAGS.visual_attn,
+                   attn_dim=FLAGS.attn_dim)
 
-    flogger.Log("Architecture: {}".format(baseline_sen))
+    flogger.Log("Agent 2 Architecture: {}".format(agent2))
     total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
-                        for p in baseline_sen.parameters()])
+                        for p in agent2.parameters()])
     flogger.Log("Total Parameters: {}".format(total_params))
-
-    # Receiver network
-    receiver = Receiver(hid_dim=FLAGS.rec_hidden,
-                        out_dim=FLAGS.rec_out_dim,
-                        z_dim=FLAGS.sender_out_dim,
-                        desc_dim=FLAGS.wv_dim,
-                        w_dim=FLAGS.rec_w_dim,
-                        s_dim=FLAGS.rec_s_dim,
-                        use_binary=FLAGS.use_binary)
-
-    flogger.Log("Architecture: {}".format(receiver))
-    total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
-                        for p in receiver.parameters()])
-    flogger.Log("Total Parameters: {}".format(total_params))
-
-    # Baseline model
-    baseline_rec = Baseline(hid_dim=FLAGS.baseline_hid_dim,
-                            x_dim=0,
-                            binary_dim=FLAGS.rec_w_dim,
-                            inp_dim=FLAGS.rec_hidden)
-
-    flogger.Log("Architecture: {}".format(baseline_rec))
-    total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
-                        for p in baseline_rec.parameters()])
-    flogger.Log("Total Parameters: {}".format(total_params))
-
-    # Get description vectors
-    if FLAGS.wv_type == "fake":
-        num_desc = 10
-        desc = Variable(torch.randn(num_desc, FLAGS.wv_dim).float())
-    elif FLAGS.wv_type == "glove.6B":
-        # Train
-        descr_train, word_dict_train, dict_size_train, label_id_to_idx_train, idx_to_label_train = read_data(
-            FLAGS.descr_train)
-
-        def map_labels_train(x): return label_id_to_idx_train.get(x)
-        word_dict_train = embed(word_dict_train, FLAGS.glove_path)
-        descr_train = cbow(descr_train, word_dict_train)
-        desc_train = torch.cat([descr_train[i]["cbow"].view(1, -1)
-                                for i in descr_train.keys()], 0)
-        desc_train = Variable(desc_train)
-        desc_train_set = torch.cat(
-            [descr_train[i]["set"].view(-1, FLAGS.wv_dim) for i in descr_train.keys()], 0)
-        desc_train_set_lens = [len(descr_train[i]["desc"])
-                               for i in descr_train.keys()]
-
-        # Dev
-        descr_dev, word_dict_dev, dict_size_dev, label_id_to_idx_dev, idx_to_label_dev = read_data(
-            FLAGS.descr_dev)
-
-        def map_labels_dev(x): return label_id_to_idx_dev.get(x)
-        word_dict_dev = embed(word_dict_dev, FLAGS.glove_path)
-        descr_dev = cbow(descr_dev, word_dict_dev)
-        desc_dev = torch.cat([descr_dev[i]["cbow"].view(1, -1)
-                              for i in descr_dev.keys()], 0)
-        desc_dev = Variable(desc_dev)
-        desc_dev_set = torch.cat(
-            [descr_dev[i]["set"].view(-1, FLAGS.wv_dim) for i in descr_dev.keys()], 0)
-        desc_dev_set_lens = [len(descr_dev[i]["desc"])
-                             for i in descr_dev.keys()]
-
-        desc_dev_dict = dict(
-            desc=desc_dev,
-            desc_set=desc_dev_set,
-            desc_set_lens=desc_dev_set_lens)
-    elif FLAGS.wv_type == "none":
-        desc = None
-    else:
-        raise NotImplementedError
 
     # Optimizer
+    # TODO potentially separate out baseline optimizers by selecting subset of params
     if FLAGS.optim_type == "SGD":
-        optimizer_rec = optim.SGD(
-            receiver.parameters(), lr=FLAGS.learning_rate)
-        optimizer_sen = optim.SGD(sender.parameters(), lr=FLAGS.learning_rate)
-        optimizer_bas_rec = optim.SGD(
-            baseline_rec.parameters(), lr=FLAGS.learning_rate)
-        optimizer_bas_sen = optim.SGD(
-            baseline_sen.parameters(), lr=FLAGS.learning_rate)
+        optimizer_agent1 = optim.SGD(
+            agent1.parameters(), lr=FLAGS.learning_rate)
+        optimizer_agent2 = optim.SGD(
+            agent2.parameters(), lr=FLAGS.learning_rate)
     elif FLAGS.optim_type == "Adam":
-        optimizer_rec = optim.Adam(
-            receiver.parameters(), lr=FLAGS.learning_rate)
-        optimizer_sen = optim.Adam(sender.parameters(), lr=FLAGS.learning_rate)
-        optimizer_bas_rec = optim.Adam(
-            baseline_rec.parameters(), lr=FLAGS.learning_rate)
-        optimizer_bas_sen = optim.Adam(
-            baseline_sen.parameters(), lr=FLAGS.learning_rate)
+        optimizer_agent1 = optim.Adam(
+            agent1.parameters(), lr=FLAGS.learning_rate)
+        optimizer_agent2 = optim.Adam(
+            agent2.parameters(), lr=FLAGS.learning_rate)
     elif FLAGS.optim_type == "RMSprop":
-        optimizer_rec = optim.RMSprop(
-            receiver.parameters(), lr=FLAGS.learning_rate)
-        optimizer_sen = optim.RMSprop(
-            sender.parameters(), lr=FLAGS.learning_rate)
-        optimizer_bas_rec = optim.RMSprop(
-            baseline_rec.parameters(), lr=FLAGS.learning_rate)
-        optimizer_bas_sen = optim.RMSprop(
-            baseline_sen.parameters(), lr=FLAGS.learning_rate)
+        optimizer_agent1 = optim.RMSprop(
+            agent1.parameters(), lr=FLAGS.learning_rate)
+        optimizer_agent2 = optim.RMSprop(
+            agent2.parameters(), lr=FLAGS.learning_rate)
     else:
         raise NotImplementedError
 
-    optimizers_dict = dict(optimizer_rec=optimizer_rec, optimizer_sen=optimizer_sen,
-                           optimizer_bas_rec=optimizer_bas_rec, optimizer_bas_sen=optimizer_bas_sen)
-    models_dict = dict(receiver=receiver, sender=sender,
-                       baseline_rec=baseline_rec, baseline_sen=baseline_sen)
+    optimizers_dict = dict(optimizer_1=optimizer_agent1,
+                           optimizer_2=optimizer_agent2)
+    models_dict = dict(agent1=agent1, agent2=agent2)
 
     # Training metrics
     epoch = 0
@@ -649,6 +719,7 @@ def run():
     best_dev_acc = 0
 
     # Optionally load previously saved model
+    # TODO check this works with new models
     if os.path.exists(FLAGS.checkpoint):
         flogger.Log("Loading from: " + FLAGS.checkpoint)
         data = torch_load(FLAGS.checkpoint, models_dict, optimizers_dict)
@@ -668,6 +739,7 @@ def run():
     if FLAGS.eval_only:
         if not os.path.exists(FLAGS.checkpoint):
             raise Exception("Must provide valid checkpoint.")
+        # TODO fix for new agents
         dev_acc, extra = eval_dev(FLAGS.dev_file, FLAGS.batch_size_dev, epoch,
                                   FLAGS.shuffle_dev, FLAGS.cuda, FLAGS.top_k_dev,
                                   sender, receiver, desc_dev_dict, map_labels_dev, FLAGS.experiment_name)
@@ -683,6 +755,7 @@ def run():
     elif FLAGS.binary_only:
         if not os.path.exists(FLAGS.checkpoint):
             raise Exception("Must provide valid checkpoint.")
+        # TODO fix for new agents
         extract_binary(FLAGS, load_hdf5, exchange, FLAGS.dev_file, FLAGS.batch_size_dev, epoch,
                        FLAGS.shuffle_dev, FLAGS.cuda, FLAGS.top_k_dev,
                        sender, receiver, desc_dev_dict, map_labels_dev, FLAGS.experiment_name)
@@ -694,360 +767,325 @@ def run():
         flogger.Log("Starting epoch: {}".format(epoch))
 
         # Read images randomly into batches - image_dim = [3, 227, 227]
-        if FLAGS.images == "cifar":
-            dataset = dset.CIFAR10(root="./", download=True, train=False,
-                                   transform=transforms.Compose([
-                                       transforms.Scale(227),
-                                       transforms.ToTensor(),
-                                       transforms.Normalize(
-                                           (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                                   ])
-                                   )
-            dataloader = torch.utils.data.DataLoader(dataset,
-                                                     batch_size=FLAGS.batch_size,
-                                                     shuffle=True)
-        elif FLAGS.images == "mammal":
-            dataloader = load_hdf5(FLAGS.train_file, FLAGS.batch_size,
-                                   epoch, FLAGS.shuffle_train, map_labels=map_labels_train)
+        if FLAGS.dataset == "test":
+            # TODO
+            dataloader = load_toy()
+        elif FLAGS.dataset == "simple":
+            # TODO
+            dataloader = load_shapes_data()
         else:
             raise NotImplementedError
 
         # Keep track of metrics
-        batch_accuracy = []
-        dev_accuracy = []
+        batch_accuracy = {'total_nc': [],  # no communicaton
+                          'total_com': [],  # after communication
+                          'rewards': [],  # total_com - total_nc
+                          'total_acc_both_nc': []  # % both agents right before comms
+                          'total_acc_both_com': []  # % both agents right after comms
+                          'total_acc_atl1_nc': []  # % at least 1 agent right before comms
+                          'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                          'agent1_nc': [],  # no communicaton
+                          'agent2_nc': [],  # no communicaton
+                          'agent1_com': [],  # after communicaton
+                          'agent2_com': []  # after communicaton
+                          }
+        dev_accuracy = {'total_nc': [],  # no communicaton
+                        'total_com': [],  # after communication
+                        'rewards': [],  # total_com - total_nc
+                        'total_acc_both_nc': []  # % both agents right before comms
+                        'total_acc_both_com': []  # % both agents right after comms
+                        'total_acc_atl1_nc': []  # % at least 1 agent right before comms
+                        'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                        'agent1_nc': [],  # no communicaton
+                        'agent2_nc': [],  # no communicaton
+                        'agent1_com': [],  # after communicaton
+                        'agent2_com': []  # after communicaton
+                        }
 
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
             target = batch["target"]
             data = batch[FLAGS.img_feat]
+            desc = batch["text_descriptions"]
 
             # GPU support
             if FLAGS.cuda:
                 data = data.cuda()
                 target = target.cuda()
                 desc_train = desc_train.cuda()
-                desc_train_set = desc_train_set.cuda()
 
             exchange_args = dict()
             exchange_args["data"] = data
-            if FLAGS.attn_extra_context:
-                exchange_args["data_context"] = batch[FLAGS.data_context]
             exchange_args["target"] = target
             exchange_args["desc"] = desc_train
-            exchange_args["desc_set"] = desc_train_set
-            exchange_args["desc_set_lens"] = desc_train_set_lens
             exchange_args["train"] = True
             exchange_args["break_early"] = not FLAGS.fixed_exchange
 
-            s, sen_w, rec_w, y, bs, br = exchange(
-                sender, receiver, baseline_sen, baseline_rec, exchange_args)
+            s, message_1, message_2, y_all, r = exchange(agent1, agent2, exchange_args)
 
-            s_masks, s_feats, s_probs = s
-            sen_feats, sen_probs = sen_w
-            rec_feats, rec_probs = rec_w
+            s_masks_1, s_feats_1, s_probs_1 = s[0]
+            s_masks_2, s_feats_2, s_probs_2 = s[1]
+            feats_1, probs_1 = message_1
+            feats_2, probs_2 = message_2
+            y_nc = y_all[0]
+            y = y_all[1]
 
             # Mask loss if dynamic exchange length
             if FLAGS.fixed_exchange:
                 binary_s_masks = None
-                binary_rec_masks = None
-                binary_sen_masks = None
-                bas_rec_masks = None
-                bas_sen_masks = None
-                y_masks = None
+                binary_agent1_masks = None
+                binary_agent2_masks = None
+                bas_agent1_masks = None
+                bas_agent2_masks = None
+                y1_masks = None
+                y2_masks = None
+                outp_1 = y[0][-1]
+                outp_2 = y[1][-1]
             else:
-                binary_s_masks = s_masks[:-1]
-                binary_rec_masks = s_masks[1:-1]
-                binary_sen_masks = s_masks[:-1]
-                bas_rec_masks = s_masks[:-1]
-                bas_sen_masks = s_masks[:-1]
-                y_masks = [torch.min(1 - m1, m2)
-                           for m1, m2 in zip(s_masks[1:], s_masks[:-1])]
+                # TODO
+                # outp_1, ent_y1 = get_outp(y[0], y1_masks)
+                # outp_2, ent_y2 = get_outp(y[1], y2_masks)
+                pass
 
-            outp, ent_y_rec = get_rec_outp(y, y_masks)
+            # Obtain predictions, loss and stats agent 1
+            # Before communication predictions
+            (dist_1_nc, maxdist_1_nc, argmax_1_nc, ent_1_nc, nll_loss_1_nc, logs_1_nc) = get_classification_loss_and_stats(y_nc[0], target)
+            # After communication predictions
+            (dist_2_nc, maxdist_2_nc, argmax_2_nc, ent_2_nc, nll_loss_2_nc, logs_2_nc) = get_classification_loss_and_stats(y_nc[1], target)
+            # Obtain predictions, loss and stats agent 1
+            # Before communication predictions
+            (dist_1, maxdist_1, argmax_1, ent_1, nll_loss_1_com, logs_1) = get_classification_loss_and_stats(outp_1, target)
+            # After communication predictions
+            (dist_2, maxdist_2, argmax_2, ent_2, nll_loss_2_com, logs_2) = get_classification_loss_and_stats(outp_2, target)
 
-            # Obtain predictions
-            debuglogger.info(f'outp: {outp.size()}')
-            dist = F.log_softmax(outp, dim=1)
-            debuglogger.info(f'dist: {dist.size()}')
-            maxdist, argmax = dist.data.max(1)
-            debuglogger.debug(f'maxdist: {maxdist}, argmax: {argmax}')
+            # Store prediction entropies
+            if FLAGS.fixed_exchange:
+                ent_agent1_y = [ent_1]
+                ent_agent2_y = [ent_2]
+            else:
+                # TODO - not implemented yet
+                ent_agent1_y = []
+                ent_agent2_y = []
 
-            # Receiver classification loss
-            nll_loss = nn.NLLLoss()(dist, Variable(target))
+            # Calculate accuracy
+            accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc)
+            accuracy_1, correct_1 = calculate_accuracy(dist_1)
+            accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc)
+            accuracy_2, correct_2 = calculate_accuracy(dist_2)
 
-            # Individual log-likelihoods across the batch
-            logs = loglikelihood(Variable(dist.data),
-                                 Variable(target.view(-1, 1)))
+            # Calculate rewards
+            total_correct_nc = correct_1_nc + correct_2_nc
+            total_correct_com = correct_1 + correct_2
+            total_accuracy_nc = (total_correct_nc == 2).sum() / batch_size
+            total_accuracy_com = (total_correct_com == 2).sum() / batch_size
+            atleast1_accuracy_nc = (total_correct_nc > 0).sum() / batch_size
+            atleast1_accuracy_com = (total_correct_com > 0).sum() / batch_size
+            # rewards = difference between performance before and after communication
+            rewards = both_correct_com - both_correct_nc
 
+            # Store results
+            batch_accuracy['agent1_nc'].append(accuracy_1_nc)
+            batch_accuracy['agent2_nc'].append(accuracy_2_nc)
+            batch_accuracy['agent1_com'].append(accuracy_1)
+            batch_accuracy['agent2_com'].append(accuracy_2)
+            batch_accuracy['total_nc'].append(total_correct_nc)
+            batch_accuracy['total_com'].append(total_correct_com)
+            batch_accuracy['rewards'].append(rewards)
+            batch_accuracy['total_acc_both_nc'].append(total_accuracy_nc)
+            batch_accuracy['total_acc_both_com'].append(total_accuracy_com)
+            batch_accuracy['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
+            batch_accuracy['total_acc_atl1_com'].append(atleast1_accuracy_com)
+
+            # Cross entropy loss for each agent
+            nll_loss_1 = nll_loss_1_nc + nll_loss_1_com
+            nll_loss_2 = nll_loss_2_nc + nll_loss_2_com
+            loss_agent1 = nll_loss_1
+            loss_agent2 = nll_loss_2
+
+            # If training communication channel
             if FLAGS.use_binary:
                 if not FLAGS.fixed_exchange:
-                    loss_binary_s, ent_binary_s = multistep_loss_binary(
-                        s_feats, s_probs, logs, br, binary_s_masks, FLAGS.entropy_s)
+                    # TODO - fix
+                    # Stop loss
+                    # The receiver might have no z-loss if we stop after first message from sender.
+                    debuglogger.warning(f'Error: multistep fixed exchange not implemented yet')
+                    sys.exit()
+                elif FLAGS.max_exchange == 1:
+                    loss_binary_1, ent_bin_1 = calculate_loss_binary(feats_1, probs_1, rewards, r[0], FLAGS.entropy_agent1)
+                    loss_binary_2, ent_bin_2 = calculate_loss_binary(feats_2, probs_2, rewards, r[1], FLAGS.entropy_agent2)
+                    loss_baseline_1 = calculate_loss_bas(r[0], rewards)
+                    loss_baseline_2 = calculate_loss_bas(r[1], rewards)
+                    ent_agent1_bin = [ent_bin_1]
+                    ent_agent2_bin = [ent_bin_2]
+                elif FLAGS.max_exchange > 1:
+                    # TODO
+                    ent_agent1_bin = []
+                    ent_agent2_bin = []
+                    debuglogger.warning(f'Error: multistep fixed exchange not implemented yet')
+                    sys.exit()
 
-                # The receiver might have no z-loss if we stop after first
-                # message from sender.
-                if len(rec_feats[:-1]) > 0:
-                    loss_binary_rec, ent_binary_rec = multistep_loss_binary(
-                        rec_feats[:-1], rec_probs[:-1], logs, br[:-1], binary_rec_masks, FLAGS.entropy_rec)
-                else:
-                    loss_binary_rec, ent_binary_rec = Variable(
-                        torch.zeros(1)), []
-
-                loss_binary_sen, ent_binary_sen = multistep_loss_binary(
-                    sen_feats, sen_probs, logs, bs, binary_sen_masks, FLAGS.entropy_sen)
-                loss_bas_rec = multistep_loss_bas(br, logs, bas_rec_masks)
-                loss_bas_sen = multistep_loss_bas(bs, logs, bas_sen_masks)
-
-            loss_rec = nll_loss
             if FLAGS.use_binary:
-                loss_rec = loss_rec + loss_binary_rec
+                loss_agent1 += loss_binary_1
+                loss_agent2 += loss_binary_2
                 if not FLAGS.fixed_exchange:
-                    loss_rec = loss_rec + loss_binary_s
-                loss_sen = loss_binary_sen
+                    # TODO
+                    pass
             else:
-                loss_sen = Variable(torch.zeros(1))
-                loss_bas_rec = Variable(torch.zeros(1))
-                loss_bas_sen = Variable(torch.zeros(1))
+                loss_baseline_1 = Variable(torch.zeros(1))
+                loss_baseline_2 = Variable(torch.zeros(1))
 
-            # Update receiver
-            optimizer_rec.zero_grad()
-            loss_rec.backward()
-            nn.utils.clip_grad_norm(receiver.parameters(), max_norm=1.)
-            optimizer_rec.step()
+            # TODO - maybe separate out baseline training
+            loss_agent1 += loss_baseline_1
+            loss_agent2 += loss_baseline_2
 
-            if FLAGS.use_binary:
-                # Update sender
-                optimizer_sen.zero_grad()
-                loss_sen.backward()
-                nn.utils.clip_grad_norm(sender.parameters(), max_norm=1.)
-                optimizer_sen.step()
+            # Update agent1
+            optimizer_agent1.zero_grad()
+            loss_agent1.backward()
+            nn.utils.clip_grad_norm(agent1.parameters(), max_norm=1.)
+            optimizer_agent1.step()
 
-                # Update baseline
-                optimizer_bas_rec.zero_grad()
-                loss_bas_rec.backward()
-                nn.utils.clip_grad_norm(baseline_rec.parameters(), max_norm=1.)
-                optimizer_bas_rec.step()
-
-                # Update baseline
-                optimizer_bas_sen.zero_grad()
-                loss_bas_sen.backward()
-                nn.utils.clip_grad_norm(baseline_sen.parameters(), max_norm=1.)
-                optimizer_bas_sen.step()
-
-            # Obtain top-k accuracy
-            top_k_ind = torch.from_numpy(dist.data.cpu().numpy().argsort()[
-                                         :, -FLAGS.top_k_train:]).long()
-            target_exp = target.view(-1,
-                                     1).expand(FLAGS.batch_size, FLAGS.top_k_train)
-            accuracy = (top_k_ind == target_exp.cpu()).sum() / \
-                float(FLAGS.batch_size)
-            batch_accuracy.append(accuracy)
+            # Update agent2
+            optimizer_agent2.zero_grad()
+            loss_agent2.backward()
+            nn.utils.clip_grad_norm(agent2.parameters(), max_norm=1.)
+            optimizer_agent2.step()
 
             # Print logs regularly
             if step % FLAGS.log_interval == 0:
                 # Average batch accuracy
-                avg_batch_acc = np.array(
-                    batch_accuracy[-FLAGS.log_interval:]).mean()
+                avg_batch_acc_total_nc = np.array(
+                    batch_accuracy['total_acc_both_nc'][-FLAGS.log_interval:]).mean()
+                avg_batch_acc_total_com = np.array(
+                    batch_accuracy['total_acc_both_com'][-FLAGS.log_interval:]).mean()
+                avg_batch_acc_atl1_nc = np.array(
+                    batch_accuracy['total_acc_atl1_nc'][-FLAGS.log_interval:]).mean()
+                avg_batch_acc_atl1_com = np.array(
+                    batch_accuracy['total_acc_atl1_com'][-FLAGS.log_interval:]).mean()
 
                 # Log accuracy
-                log_acc = "Epoch: {} Step: {} Batch: {} Training Accuracy: {}"\
-                          .format(epoch, step, i_batch, avg_batch_acc)
+                log_acc = "Epoch: {} Step: {} Batch: {} Training Accuracy:\nBefore comms: Both correct: {} At least 1 correct: {}\nAfter comms: Both correct: {} At least 1 correct: {}".format(epoch, step, i_batch, avg_batch_acc_total_nc, avg_batch_acc_atl1_nc, avg_batch_acc_total_com, avg_batch_acc_atl1_com)
                 flogger.Log(log_acc)
 
-                # Sender
-                log_loss_sen = "Epoch: {} Step: {} Batch: {} Loss Sender: {}".format(
-                    epoch, step, i_batch, loss_sen.data[0])
-                flogger.Log(log_loss_sen)
+                # Agent1
+                log_loss_agent1 = "Epoch: {} Step: {} Batch: {} Loss Agent1: {}".format(
+                    epoch, step, i_batch, loss_agent1.data[0])
+                flogger.Log(log_loss_agent1)
+                # Agent 1 breakdown
+                log_loss_agent1_detail = "Epoch: {} Step: {} Batch: {} Loss Agent1: NLL: {} (BC:{} / AC:{}), RL: {}, Baseline: {} ".format(
+                    epoch, step, i_batch, nll_loss_1.data[0], nll_loss_1_nc.data[0], nll_loss_1_com.data[0], loss_binary_1.data[0], loss_baseline_1.data[0])
+                flogger.Log(log_loss_agent1_detail)
 
-                # Receiver
-                log_loss_rec_y = "Epoch: {} Step: {} Batch: {} Loss Receiver (Y): {}".format(
-                    epoch, step, i_batch, nll_loss.data[0])
-                flogger.Log(log_loss_rec_y)
-                if FLAGS.use_binary:
-                    log_loss_rec_z = "Epoch: {} Step: {} Batch: {} Loss Receiver (Z): {}".format(
-                        epoch, step, i_batch, loss_binary_rec.data[0])
-                    flogger.Log(log_loss_rec_z)
-                    if not FLAGS.fixed_exchange:
-                        log_loss_rec_s = "Epoch: {} Step: {} Batch: {} Loss Receiver (S): {}".format(
-                            epoch, step, i_batch, loss_binary_s.data[0])
-                        flogger.Log(log_loss_rec_s)
-
-                # Baslines
-                if FLAGS.use_binary:
-                    log_loss_bas_s = "Epoch: {} Step: {} Batch: {} Loss Baseline (S): {}".format(
-                        epoch, step, i_batch, loss_bas_sen.data[0])
-                    flogger.Log(log_loss_bas_s)
-                    log_loss_bas_r = "Epoch: {} Step: {} Batch: {} Loss Baseline (R): {}".format(
-                        epoch, step, i_batch, loss_bas_rec.data[0])
-                    flogger.Log(log_loss_bas_r)
+                # Agent2
+                log_loss_agent2 = "Epoch: {} Step: {} Batch: {} Loss Agent2: {}".format(
+                    epoch, step, i_batch, loss_agent2.data[0])
+                flogger.Log(log_loss_agent2)
+                # Agent 2 breakdown
+                log_loss_agent2_detail = "Epoch: {} Step: {} Batch: {} Loss Agent2: NLL: {} (BC:{} / AC:{}), RL: {}, Baseline: {} ".format(
+                    epoch, step, i_batch, nll_loss_2.data[0], nll_loss_2_nc.data[0], nll_loss_2_com.data[0], loss_binary_2.data[0], loss_baseline_2.data[0])
+                flogger.Log(log_loss_agent2_detail)
 
                 # Log predictions
-                log_pred = "Predictions: {}".format(
-                    torch.cat([target, argmax], 0).view(-1, FLAGS.batch_size))
+                log_pred = "Predictions: Target | Agent1 BC | Agent1 AC | Agent2 BC | Agent2 AC: {}".format(
+                    torch.cat([target, argmax_1_nc, argmax_1, argmax_2_nc, argmax_2], 0).view(-1, FLAGS.batch_size))
                 flogger.Log(log_pred)
 
-                # Log Entropy
+                # Log Entropy for both Agents
                 if FLAGS.use_binary:
-                    if len(ent_binary_sen) > 0:
-                        log_ent_sen_bin = "Entropy Sender Binary"
-                        for i, ent in enumerate(ent_binary_sen):
-                            log_ent_sen_bin += "\n{}. {}".format(
+                    if len(ent_agent1_bin) > 0:
+                        log_ent_agent1_bin = "Entropy Agent1 Binary"
+                        for i, ent in enumerate(ent_agent1_bin):
+                            log_ent_agent1_bin += "\n{}. {}".format(
                                 i, -ent.data[0])
-                        log_ent_sen_bin += "\n"
-                        flogger.Log(log_ent_sen_bin)
+                        log_ent_agent1_bin += "\n"
+                        flogger.Log(log_ent_agent1_bin)
 
-                    if len(ent_binary_rec) > 0:
-                        log_ent_rec_bin = "Entropy Receiver Binary"
-                        for i, ent in enumerate(ent_binary_rec):
-                            log_ent_rec_bin += "\n{}. {}".format(
+                    if len(ent_agent2_bin) > 0:
+                        log_ent_agent2_bin = "Entropy Agent2 Binary"
+                        for i, ent in enumerate(ent_agent2_bin):
+                            log_ent_agent2_bin += "\n{}. {}".format(
                                 i, -ent.data[0])
-                        log_ent_rec_bin += "\n"
-                        flogger.Log(log_ent_rec_bin)
+                        log_ent_agent2_bin += "\n"
+                        flogger.Log(log_ent_agent2_bin)
 
-                if len(ent_y_rec) > 0:
-                    log_ent_rec_y = "Entropy Receiver Predictions"
-                    for i, ent in enumerate(ent_y_rec):
-                        log_ent_rec_y += "\n{}. {}".format(i, -ent.data[0])
-                    log_ent_rec_y += "\n"
-                    flogger.Log(log_ent_rec_y)
+                if len(ent_agent1_y) > 0:
+                    log_ent_agent1_y = "Entropy Agent1 Predictions"
+                    log_ent_agent1_y += "No comms entropy {}\n Comms entropy\n".format(ent_1_nc.data[0])
+                    for i, ent in enumerate(ent_agent1_y):
+                        log_ent_agent1_y += "\n{}. {}".format(i, -ent.data[0])
+                    log_ent_agent1_y += "\n"
+                    flogger.Log(log_ent_agent1_y)
+
+                if len(ent_agent2_y) > 0:
+                    log_ent_agent2_y = "Entropy Agent2 Predictions"
+                    log_ent_agent2_y += "No comms entropy {}\n Comms entropy\n".format(ent_2_nc.data[0])
+                    for i, ent in enumerate(ent_agent2_y):
+                        log_ent_agent2_y += "\n{}. {}".format(i, -ent.data[0])
+                    log_ent_agent2_y += "\n"
+                    flogger.Log(log_ent_agent2_y)
 
                 # Optionally print sampled and inferred binary vectors from
                 # most recent exchange.
                 if FLAGS.exchange_samples > 0:
 
-                    current_exchange = len(sen_feats)
-
-                    log_train = "Train:"
-                    for i_sample in range(FLAGS.exchange_samples):
-                        prev_sen = torch.FloatTensor(FLAGS.rec_w_dim).fill_(0)
-                        prev_rec = torch.FloatTensor(FLAGS.rec_w_dim).fill_(0)
-                        for i_exchange in range(current_exchange):
-                            sen_probs_i = sen_probs[i_exchange][i_sample].data.tolist(
-                            )
-                            sen_spark = sparks(
-                                [1] + sen_probs_i)[1:].encode('utf-8')
-                            rec_probs_i = rec_probs[i_exchange][i_sample].data.tolist(
-                            )
-                            rec_spark = sparks(
-                                [1] + rec_probs_i)[1:].encode('utf-8')
-                            s_probs_i = s_probs[i_exchange][i_sample].data.tolist(
-                            )
-                            s_spark = sparks(
-                                [1] + s_probs_i)[1:].encode('utf-8')
-
-                            sen_binary = sen_feats[i_exchange][i_sample].data.cpu(
-                            )
-                            sen_hamming = (prev_sen - sen_binary).abs().sum()
-                            prev_sen = sen_binary
-                            rec_binary = rec_feats[i_exchange][i_sample].data.cpu(
-                            )
-                            rec_hamming = (prev_rec - rec_binary).abs().sum()
-                            prev_rec = rec_binary
-
-                            sen_msg = "".join(
-                                map(str, map(int, sen_binary.tolist())))
-                            rec_msg = "".join(
-                                map(str, map(int, rec_binary.tolist())))
-                            if FLAGS.use_alpha:
-                                sen_msg = bin_to_alpha(sen_msg)
-                                rec_msg = bin_to_alpha(rec_msg)
-                            if i_exchange == 0:
-                                log_train += "\n{:>3}".format(i_sample)
-                            else:
-                                log_train += "\n   "
-                            log_train += "        {}".format(sen_spark)
-                            log_train += "           {}    {}".format(
-                                s_spark, rec_spark)
-                            log_train += "\n    {:>3} S: {} {:4}".format(
-                                i_exchange, sen_msg, sen_hamming)
-                            log_train += "    s={} R: {} {:4}".format(
-                                s_masks[1:][i_exchange][i_sample].data[0], rec_msg, rec_hamming)
-                    log_train += "\n"
+                    log_train = log_exchange(s, message_1, message_2, current_exchange, log_type="Train:")
                     flogger.Log(log_train)
 
                     exchange_args["train"] = False
-                    s, sen_w, rec_w, y, bs, br = exchange(
-                        sender, receiver, baseline_sen, baseline_rec, exchange_args)
-                    s_masks, s_feats, s_probs = s
-                    sen_feats, sen_probs = sen_w
-                    rec_feats, rec_probs = rec_w
+                    s, message_1, message_2, y_all, r = exchange(agent1, agent2, exchange_args)
 
-                    current_exchange = len(sen_feats)
+                    log_train = log_exchange(s, message_1, message_2, current_exchange, log_type="Eval:")
+                    flogger.Log(log_train)
 
-                    log_eval = "Eval:"
-                    for i_sample in range(FLAGS.exchange_samples):
-                        prev_sen = torch.FloatTensor(FLAGS.rec_w_dim).fill_(0)
-                        prev_rec = torch.FloatTensor(FLAGS.rec_w_dim).fill_(0)
-                        for i_exchange in range(current_exchange):
-                            sen_probs_i = sen_probs[i_exchange][i_sample].data.tolist(
-                            )
-                            sen_spark = sparks(
-                                [1] + sen_probs_i)[1:].encode('utf-8')
-                            rec_probs_i = rec_probs[i_exchange][i_sample].data.tolist(
-                            )
-                            rec_spark = sparks(
-                                [1] + rec_probs_i)[1:].encode('utf-8')
-                            s_probs_i = s_probs[i_exchange][i_sample].data.tolist(
-                            )
-                            s_spark = sparks(
-                                [1] + s_probs_i)[1:].encode('utf-8')
-
-                            sen_binary = sen_feats[i_exchange][i_sample].data.cpu(
-                            )
-                            sen_hamming = (prev_sen - sen_binary).abs().sum()
-                            prev_sen = sen_binary
-                            rec_binary = rec_feats[i_exchange][i_sample].data.cpu(
-                            )
-                            rec_hamming = (prev_rec - rec_binary).abs().sum()
-                            prev_rec = rec_binary
-
-                            sen_msg = "".join(
-                                map(str, map(int, sen_binary.tolist())))
-                            rec_msg = "".join(
-                                map(str, map(int, rec_binary.tolist())))
-                            if FLAGS.use_alpha:
-                                sen_msg = bin_to_alpha(sen_msg)
-                                rec_msg = bin_to_alpha(rec_msg)
-                            if i_exchange == 0:
-                                log_eval += "\n{:>3}".format(i_sample)
-                            else:
-                                log_eval += "\n   "
-                            log_eval += "        {}".format(sen_spark)
-                            log_eval += "           {}    {}".format(
-                                s_spark, rec_spark)
-                            log_eval += "\n    {:>3} S: {} {:4}".format(
-                                i_exchange, sen_msg, sen_hamming)
-                            log_eval += "    s={} R: {} {:4}".format(
-                                s_masks[1:][i_exchange][i_sample].data[0], rec_msg, rec_hamming)
-                    log_eval += "\n"
-                    flogger.Log(log_eval)
-
-                # Sender
-                logger.log(key="Loss Sender",
-                           val=loss_sen.data[0], step=step)
-
-                # Receiver
-                logger.log(key="Loss Receiver (Y)",
-                           val=nll_loss.data[0], step=step)
+                # Agent 1
+                logger.log(key="Loss Agent 1 (Total)",
+                           val=loss_agent1.data[0], step=step)
+                logger.log(key="Loss Agent 1 (NLL)",
+                           val=nll_loss_1.data[0], step=step)
+                logger.log(key="Loss Agent 1 (NLL NC)",
+                           val=nll_loss_1_nc.data[0], step=step)
+                logger.log(key="Loss Agent 1 (NLL COM)",
+                           val=nll_loss_1_com.data[0], step=step)
                 if FLAGS.use_binary:
-                    logger.log(key="Loss Receiver (Z)",
-                               val=loss_binary_rec.data[0], step=step)
+                    logger.log(key="Loss Agent 1 (RL)",
+                               val=loss_binary_1.data[0], step=step)
+                    logger.log(key="Loss Agent 1 (BAS)",
+                               val=loss_baseline_1.data[0], step=step)
                     if not FLAGS.fixed_exchange:
-                        logger.log(key="Loss Receiver (S)",
-                                   val=loss_binary_s.data[0], step=step)
+                        # TODO
+                        pass
 
-                # Baselines
+                # Agent 2
+                logger.log(key="Loss Agent 2 (Total)",
+                           val=loss_agent2.data[0], step=step)
+                logger.log(key="Loss Agent 2 (NLL)",
+                           val=nll_loss_2.data[0], step=step)
+                logger.log(key="Loss Agent 2 (NLL NC)",
+                           val=nll_loss_2_nc.data[0], step=step)
+                logger.log(key="Loss Agent 2 (NLL COM)",
+                           val=nll_loss_2_com.data[0], step=step)
                 if FLAGS.use_binary:
-                    logger.log(key="Loss Baseline (S)",
-                               val=loss_bas_sen.data[0], step=step)
-                    logger.log(key="Loss Baseline (R)",
-                               val=loss_bas_rec.data[0], step=step)
+                    logger.log(key="Loss Agent 2 (RL)",
+                               val=loss_binary_2.data[0], step=step)
+                    logger.log(key="Loss Agent 2 (BAS)",
+                               val=loss_baseline_2.data[0], step=step)
+                    if not FLAGS.fixed_exchange:
+                        # TODO
+                        pass
 
-                logger.log(key="Training Accuracy",
-                           val=avg_batch_acc, step=step)
+                # Accuracy metrics
+                logger.log(key="Training Accuracy (Total, BC)",
+                           val=avg_batch_acc_total_nc, step=step)
+                logger.log(key="Training Accuracy (At least 1, BC)",
+                           val=avg_batch_acc_atl1_nc, step=step)
+                logger.log(key="Training Accuracy (Total, COM)",
+                           val=avg_batch_acc_total_com, step=step)
+                logger.log(key="Training Accuracy (At least 1, COM)",
+                           val=avg_batch_acc_atl1_com, step=step)
 
             # Report development accuracy
+            # HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!
             if step % FLAGS.log_dev == 0:
+                # TODO - fix for symmetric agents
                 dev_acc, extra = eval_dev(FLAGS.dev_file, FLAGS.batch_size_dev, epoch,
                                           FLAGS.shuffle_dev, FLAGS.cuda, FLAGS.top_k_dev,
                                           sender, receiver, desc_dev_dict, map_labels_dev, FLAGS.experiment_name)
@@ -1235,8 +1273,8 @@ def flags():
     gflags.DEFINE_float("learning_rate", 1e-4, "Used in optimizer.")
     gflags.DEFINE_integer("max_epoch", 500, "")
     gflags.DEFINE_float("entropy_s", None, "")
-    gflags.DEFINE_float("entropy_sen", None, "")
-    gflags.DEFINE_float("entropy_rec", None, "")
+    gflags.DEFINE_float("entropy_agent1", None, "")
+    gflags.DEFINE_float("entropy_agent2", None, "")
 
     # Conversation settings
     gflags.DEFINE_integer("exchange_samples", 3, "")

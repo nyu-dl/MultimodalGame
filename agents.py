@@ -57,17 +57,24 @@ class ImageProcessor(nn.Module):
         batch_size, n_feats, channels = x.size()
         # Process hidden state
         h_w_attn = self.attn_W_w(h_z)
+        debuglogger.debug(f'h_w_attn: {h_w_attn.size()}')
         h_w_attn_broadcast = h_w_attn.contiguous().unsqueeze(
             1).expand(batch_size, n_feats, self.attn_dim)
+        debuglogger.debug(f'h_w_broadcast: {h_w_broadcast.size()}')
         h_w_attn_flat = h_w_attn_broadcast.contiguous().view(
             batch_size * n_feats, self.attn_dim)
+        debuglogger.debug(f'h_w_flat: {h_w_flat.size()}')
         # Process image
         x_flat = x.contiguous().view(batch_size * n_feats, channels)
+        debuglogger.debug(f'x_flat: {x_flat.size()}')
         h_x_attn_flat = self.attn_W_x(x_flat)
+        debuglogger.debug(f'h_x_attn_flat: {h_x_attn_flat.size()}')
         # Calculate attention scores
         attn_U_inp = nn.Tanh()(h_w_attn_flat + h_x_attn_flat)
         attn_scores_flat = self.attn_U(attn_U_inp)
+        debuglogger.debug(f'attn_scores_flat: {attn_scores_flat.size()}')
         attn_scores = attn_scores_flat.view(batch_size, n_feats)
+        debuglogger.debug(f'attn_scores: {attn_scores.size()}')
 
         return attn_scores
 
@@ -82,13 +89,15 @@ class ImageProcessor(nn.Module):
         Returns
             h_i = im_transform(x)
         '''
-        batch_size, n_feats, channels = x.size()
-
+        debuglogger.debug(f'Inside image processing...')
         if self.use_attn:
             batch_size, channels, height, width = x.size()
             n_feats = height * width
+            debuglogger.debug(f'x: {x.size()}')
             x = x.view(batch_size, channels, n_feats)
+            debuglogger.debug(f'x: {x.size()}')
             x = x.transpose(1, 2)
+            debuglogger.debug(f'x: {x.size()}')
             attn_scores = self.get_attn_scores(x, h_z)
             # attention scores
             if t == 0:
@@ -98,6 +107,7 @@ class ImageProcessor(nn.Module):
             else:
                 attn_scores = F.softmax(attn_scores, dim=1)
             debuglogger.debug(f'attn_scores: {attn_scores.size()}')
+            debuglogger.debug(f'attn_scores: {attn_scores}')
             x_attn = torch.bmm(attn_scores.unsqueeze(1), x).squeeze()
             debuglogger.debug(f'x with attn: {x_attn.size()}')
             # Cache values for inspection
@@ -187,23 +197,28 @@ class MessageGenerator(nn.Module):
         y_broadcast = y_scores.unsqueeze(2).expand(
             batch_size, num_classes, self.hid_dim)
         debuglogger.debug(f'y_broadcast: {y_broadcast.size()}')
+        debuglogger.debug(f'y_broadcast: {y_broadcast}')
         debuglogger.debug(f'desc: {desc.size()}')
         desc = torch.mul(y_broadcast, desc).sum(1).squeeze(1)
         debuglogger.debug(f'desc: {desc.size()}')
         # desc: batch_size x hid_dim
-        h_w = F.tanh(self.w_h(self.h_c) + self.w_d(desc))
+        h_w = F.tanh(self.w_h(h_c) + self.w_d(desc))
         w_scores = self.w(h_w)
         if self.use_binary:
             w_probs = F.sigmoid(w_scores)
             if training:
                 probs_ = w_probs.data.cpu().numpy()
-                w_binary = Variable(torch.from_numpy(
-                    (np.random.rand(*probs_.shape) < probs_).astype('float32')))
+                rand_num = np.random.rand(*probs_.shape)
+                debuglogger.debug(f'rand_num: {rand_num}')
+                debuglogger.debug(f'probs: {probs_}')
+                w_binary = _Variable(torch.from_numpy(
+                    (rand_num < probs_).astype('float32')))
             else:
                 w_binary = torch.round(w_probs).detach()
             if w_probs.is_cuda:
                 w_binary = w_binary.cuda()
             w_feats = w_binary
+            debuglogger.debug(f'w_binary: {w_binary}')
         else:
             w_feats = w_scores
             w_probs = None
@@ -342,6 +357,11 @@ class Agent(nn.Module):
             y: A prediction for each class described in the descriptions.
             r: An estimate of the reward the agent will receive
         """
+        debuglogger.debug(f'Input sizes...')
+        debuglogger.debug(f'x: {x.size()}')
+        debuglogger.debug(f'm: {m.size()}')
+        debuglogger.debug(f'desc: {desc.size()}')
+
         # Initialize hidden state if necessary
         if self.h_z is None:
             self.h_z = self.initial_state(batch_size)
@@ -369,20 +389,24 @@ class Agent(nn.Module):
         debuglogger.debug(f'r: {r.size()}')
 
         # Calculate stop bits
-        s_score = self.s(self.h_c)
+        s_score = self.s(h_c)
         s_prob = F.sigmoid(s_score)
         debuglogger.debug(f's_score: {s_score.size()}')
         debuglogger.debug(f's_prob: {s_prob.size()}')
         if training:
             # Sample decisions
             prob_ = s_prob.data.cpu().numpy()
-            s_binary = Variable(torch.from_numpy(
-                (np.random.rand(*prob_.shape) < prob_).astype('float32')))
+            rand_num = np.random.rand(*prob_.shape)
+            debuglogger.debug(f'rand_num: {rand_num}')
+            debuglogger.debug(f'prob: {prob_}')
+            s_binary = _Variable(torch.from_numpy(
+                (rand_num < prob_).astype('float32')))
         else:
             # Infer decisions
             # TODO check re. old implementation
             s_binary = torch.round(s_prob).detach()
         debuglogger.debug(f'stop decisions: {s_binary.size()}')
+        debuglogger.debug(f'stop decisions: {s_binary}')
 
         # Predict classes
         # desc_proc:    bs x num_classes x hid_dim
@@ -391,9 +415,11 @@ class Agent(nn.Module):
         h_c_expand = torch.unsqueeze(
             h_c, dim=1).expand(-1, self.num_classes, -1)
         debuglogger.debug(f'h_c_expand: {h_c_expand.size()}')
+        debuglogger.debug(f'h_c: {h_c}')
+        debuglogger.debug(f'h_c_expand: {h_c_expand}')
         hid_cat_desc = torch.cat([h_c_expand, desc_proc], dim=2)
         debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
-        hid_cat_desc = hid_cat_desc.view(-1, self.hid_dim * 2)
+        hid_cat_desc = hid_cat_desc.view(-1, self.h_dim * 2)
         debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
         y = F.relu(self.y1(hid_cat_desc))
         debuglogger.debug(f'y: {y.size()}')
@@ -402,6 +428,7 @@ class Agent(nn.Module):
         # y: batch_size * num_classes
         y_scores = F.softmax(y, dim=1).detach()
         debuglogger.debug(f'y_scores: {y_scores.size()}')
+        debuglogger.debug(f'y_scores: {y_scores}')
 
         # Generate message
         w, w_probs = self.message_generator(y_scores, h_c, desc_proc, training)
@@ -414,11 +441,11 @@ class Agent(nn.Module):
 if __name__ == "__main__":
     print("Testing agent init and forward pass...")
     im_feature_type = ""
-    im_feat_dim = 256
-    h_dim = 64
-    m_dim = 32
+    im_feat_dim = 128
+    h_dim = 4
+    m_dim = 6
     desc_dim = 100
-    num_classes = 10
+    num_classes = 3
     s_dim = 1
     use_binary = True
     use_message = True

@@ -1,0 +1,100 @@
+triangle
+blue
+circle || blue
+green || triangle
+green || triangle
+red
+triangle
+circle || blue
+red || square
+circle
+blue
+red || square
+circle || blue
+green || triangle
+blue
+circle || blue
+triangle
+square
+circle
+green
+green || triangle
+triangle
+green
+green || triangle
+blue
+green
+circle || blue
+red
+circle || blue
+green || triangle
+square
+circle || blue
+circle || blue
+red
+red || square
+circle || blue
+green || triangle
+red || square
+red
+red
+green || triangle
+green || triangle
+triangle
+circle
+blue
+green || triangle
+green
+circle || blue
+circle || blue
+circle || blue
+green || triangle
+red || square
+red || square
+red || square
+green
+blue
+green
+circle || blue
+red || square
+circle || blue
+green
+circle || blue
+blue
+triangle
+green
+green || triangle
+triangle
+red || square
+red || square
+circle
+square
+blue
+circle
+circle || blue
+triangle
+blue
+red || square
+green || triangle
+circle
+circle || blue
+green || triangle
+blue
+green
+circle
+red || square
+green || triangle
+circle || blue
+red || square
+green
+red || square
+triangle
+circle || blue
+red || square
+green || triangle
+green || triangle
+red || square
+red || square
+green
+circle || blue
+green || triangle

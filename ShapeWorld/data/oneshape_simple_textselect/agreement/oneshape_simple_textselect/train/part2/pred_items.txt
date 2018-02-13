@@ -1,0 +1,100 @@
+cyan || triangle
+rectangle || gray
+pentagon || green
+blue
+magenta
+blue || square
+green
+cyan || triangle
+green
+gray
+cross
+yellow || pentagon
+cross
+gray || pentagon
+pentagon || magenta
+magenta
+gray
+cyan || square
+square
+gray
+blue || pentagon
+red || pentagon
+blue || triangle
+semicircle || blue
+cyan
+square
+cross || green
+magenta
+red || pentagon
+ellipse
+blue || pentagon
+circle
+magenta
+semicircle
+semicircle
+semicircle || yellow
+rectangle
+red || triangle
+green
+rectangle || magenta
+pentagon || cyan
+circle || magenta
+red || ellipse
+red
+red
+yellow || ellipse
+circle || green
+circle || green
+cross || cyan
+pentagon || green
+semicircle || magenta
+yellow
+cross || green
+yellow || square
+ellipse || green
+circle
+red
+rectangle || gray
+magenta || triangle
+square
+blue
+ellipse
+pentagon || magenta
+gray || circle
+cyan || triangle
+magenta
+ellipse || magenta
+cross
+green || square
+blue
+blue
+blue || triangle
+circle || cyan
+gray || pentagon
+semicircle || green
+magenta || triangle
+pentagon
+cross
+semicircle || yellow
+gray || square
+gray || pentagon
+cyan
+blue || pentagon
+cyan || triangle
+semicircle
+yellow
+yellow || cross
+gray || cross
+gray
+semicircle || blue
+green
+blue
+yellow || circle
+pentagon
+green
+gray || cross
+magenta || square
+cross || cyan
+pentagon
+blue || cross

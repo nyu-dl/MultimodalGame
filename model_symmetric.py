@@ -25,12 +25,10 @@ from misc import recursively_set_device, torch_save, torch_load
 from misc import VisdomLogger as Logger
 from misc import FileLogger
 from misc import read_log_load
-from misc import load_hdf5
-from misc import read_data
-from misc import embed
-from misc import cbow
 from misc import xavier_normal
 from misc import build_mask
+
+from dataset_loader import load_shapeworld_dataset
 
 from sparks import sparks
 
@@ -767,13 +765,9 @@ def run():
 
         flogger.Log("Starting epoch: {}".format(epoch))
 
-        # Read images randomly into batches - image_dim = [3, 227, 227]
-        if FLAGS.dataset == "test":
-            # TODO
-            dataloader = load_toy()
-        elif FLAGS.dataset == "simple":
-            # TODO
-            dataloader = load_shapes_data()
+        # Read dataset randomly into batches
+        if FLAGS.dataset == "shapeworld":
+            dataloader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_mode, FLAGS.dataset_size, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
         else:
             raise NotImplementedError
 
@@ -1218,11 +1212,16 @@ def flags():
     # Data settings
     gflags.DEFINE_enum("wv_type", "glove.6B", ["fake", "glove.6B", "none"], "")
     gflags.DEFINE_integer("wv_dim", 100, "")
-    gflags.DEFINE_string("descr_train", "descriptions.csv", "")
-    gflags.DEFINE_string("descr_dev", "descriptions.csv", "")
-    gflags.DEFINE_string("train_file", "train.hdf5", "")
-    gflags.DEFINE_string("dev_file", "dev.hdf5", "")
-    gflags.DEFINE_enum("images", "mammal", ["cifar", "mammal"], "")
+    gflags.DEFINE_string("dataset_path", "./Shapeworld/data/oneshape_simple_textselect", "")
+    gflags.DEFINE_string("dataset_mode", "train", "")
+    gflags.DEFINE_string("dataset_type", "agreement", "")
+    gflags.DEFINE_string("dataset_name", "oneshape_simple_textselect", "")
+    gflags.DEFINE_integer("dataset_size", 100, "")
+    # gflags.DEFINE_string("descr_train", "descriptions.csv", "")
+    # gflags.DEFINE_string("descr_dev", "descriptions.csv", "")
+    # gflags.DEFINE_string("train_file", "train.hdf5", "")
+    # gflags.DEFINE_string("dev_file", "dev.hdf5", "")
+    # gflags.DEFINE_enum("images", "mammal", ["cifar", "mammal"], "")
     gflags.DEFINE_string(
         "glove_path", "./glove.6B/glove.6B.100d.txt", "")
     gflags.DEFINE_boolean("shuffle_train", True, "")

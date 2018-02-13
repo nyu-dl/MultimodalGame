@@ -81,7 +81,7 @@ def convert_texts(texts, word_dict=None):
     return texts_ints, word2id, id2word
 
 
-def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, batch_size, random_seed, shuffle, img_feats, truncate_final_batch=False):
+def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, batch_size, random_seed, shuffle, img_feats, cuda, truncate_final_batch=False):
     """
     Reads ShapeWorld dataset into random num_batches
     Args:
@@ -95,6 +95,7 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         - random_seed: int to use to set random seed
         - shuffle: whether to shuffle the dataset
         - img_feats: what type of image features to use e.g. 'avgpool_512', 'layer4_2'
+        - whether to use cuda
         - truncate_final_batch: whether to use a smaller final batch or not
 
     Each batch is a dict consisting of:
@@ -187,8 +188,13 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
                                 "desc_set_lens": desc_set_lens}
 
         # Extract image feats
-        batch["im_feats_1"] = model(Variable(batch['masked_im_1']), request=img_feats)
-        batch["im_feats_2"] = model(Variable(batch['masked_im_2']), request=img_feats)
+        m_im_1 = Variable(batch['masked_im_1'])
+        m_im_2 = Variable(batch['masked_im_2'])
+        if cuda:
+            m_im_1 = m_im_1.cuda()
+            m_im_2 = m_im_2.cuda()
+        batch["im_feats_1"] = model(m_im_1, request=img_feats)
+        batch["im_feats_2"] = model(m_im_2, request=img_feats)
         yield batch
 
 
@@ -197,7 +203,7 @@ if __name__ == "__main__":
     gflags.DEFINE_enum("resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")
     FLAGS(sys.argv)
 
-    data_path = '/Users/lauragraesser/Documents/NYU_Courses/Comms/data/oneshape_simple_textselect'
+    data_path = './ShapeWorld/data/oneshape_simple_textselect'
     embed_path = './glove.6B/glove.6B.100d.txt'
     mode = 'train'
     size = 100
@@ -207,7 +213,8 @@ if __name__ == "__main__":
     random_seed = 12
     img_feats = 'avgpool_512'
     shuffle = True
-    dataloader = load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, batch_size, random_seed, shuffle, img_feats, truncate_final_batch=False)
+    cuda = False
+    dataloader = load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, batch_size, random_seed, shuffle, img_feats, cuda, truncate_final_batch=False)
     for i_batch, batch in enumerate(dataloader):
         pprint.pprint(batch)
         break

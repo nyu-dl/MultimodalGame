@@ -40,10 +40,10 @@ import gflags
 
 FLAGS = gflags.FLAGS
 
-FORMAT = '%(asctime)-15s %(message)s'
+FORMAT = '[%(asctime)s %(levelname)s] %(message)s'
 logging.basicConfig(format=FORMAT)
 debuglogger = logging.getLogger('main_logger')
-debuglogger.setLevel(30)
+debuglogger.setLevel('INFO')
 
 
 def Variable(*args, **kwargs):

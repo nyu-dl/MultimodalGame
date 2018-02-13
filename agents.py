@@ -10,10 +10,10 @@ import logging
 
 from misc import xavier_normal
 
-FORMAT = '%(asctime)-15s %(message)s'
+FORMAT = '[%(asctime)s %(levelname)s] %(message)s'
 logging.basicConfig(format=FORMAT)
 debuglogger = logging.getLogger('main_logger')
-debuglogger.setLevel(10)
+debuglogger.setLevel('INFO')
 
 
 def reset_parameters_util(model):

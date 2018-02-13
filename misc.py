@@ -11,11 +11,18 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import string
 import itertools
+import logging
 
 try:
     from visdom import Visdom
 except:
     pass
+
+
+FORMAT = '[%(asctime)s %(levelname)s] %(message)s'
+logging.basicConfig(format=FORMAT)
+debuglogger = logging.getLogger('main_logger')
+debuglogger.setLevel('DEBUG')
 
 
 """
@@ -339,6 +346,38 @@ def cbow(descr, word_dict):
         descr[mammal]["cbow"] = desc_cbow
         descr[mammal]["set"] = desc_set
     return descr
+
+
+# Function computing CBOW for each set of descriptions
+def cbow_general(texts, word2id, id2word):
+    '''Takes a batch of n texts per example. Each example is a list of ints corresponding to a textual description of the image
+    Returns: two tensors.
+                1. cbow vector for each example
+                    size: batch_size x desc_per_elem x embedding_dim
+                2. individual word vectors for each example
+                    size: batch_size x desc_per_elem x max_description_length x embedding_dim
+                    sentences shorter than max_length are 0 padded at the end'''
+    emb_size = len(list(word2id.values())[1]["emb"])
+    desc_per_eg = len(texts[0])
+    max_len = max([max([len(e) for e in t]) for t in texts])  # max length of sentence
+    debuglogger.debug(f'batch_size: {len(texts)}, desc per eg: {desc_per_eg}, emb size: {emb_size}, max len: {max_len}')
+    desc_set = torch.FloatTensor(len(texts), desc_per_eg, max_len, emb_size).fill_(0)
+    desc_set_lens = torch.FloatTensor(len(texts), desc_per_eg).fill_(0)
+    desc_cbow = torch.FloatTensor(len(texts), desc_per_eg, emb_size).fill_(0)
+    for i_t, t in enumerate(texts):
+        for i_e, e in enumerate(t):
+            num_w = 0
+            for i_w, w in enumerate(e):
+                if word2id[id2word[w]]["emb"] is not None:
+                    desc_set[i_t, i_e, i_w, :] = word2id[id2word[w]]["emb"]
+                    num_w += 1
+            desc_cbow[i_t, i_e] = desc_set[i_t, i_e, :, :].sum(0).squeeze()
+            if num_w > 0:
+                desc_cbow[i_t, i_e] /= num_w
+            desc_set_lens[i_t, i_e] = num_w
+    # debuglogger.debug(f'cbow: {desc_cbow}')
+    # debuglogger.debug(f'lens: {desc_set_lens}')
+    return desc_cbow, desc_set, desc_set_lens
 
 
 """

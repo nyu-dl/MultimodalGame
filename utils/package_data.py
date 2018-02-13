@@ -115,8 +115,8 @@ class FeatureModel(nn.Module):
 
         layers += [
             #(model.avgpool, 'avgpool'),
-            # avgpool fix to get to original specifid dimensions - perhaps ResNet spec changed? 
-            (AvgPool2d(kernel_size=8, stride=1, padding=0, ceil_mode=False, count_include_pad=True), 'avgpool'),
+            # avgpool fix to get to original specifid dimensions - perhaps ResNet spec changed?
+            (AvgPool2d(kernel_size=8, stride=1, padding=0, ceil_mode=False, count_include_pad=True), 'avgpool_4D'),
             (lambda x: x.view(x.size(0), -1), 'avgpool_512'),
             (model.fc, 'fc'),
         ]
@@ -131,7 +131,7 @@ class FeatureModel(nn.Module):
             # print("=0", (x.data == 0.).sum())
             # print("{} - {}".format(name, tuple(x.size())))
             if name in request:
-                #print(f'{name} in request, appending...')
+                # print(f'{name} in request, appending...')
                 ret.append(x)
 
         return ret

@@ -193,8 +193,8 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         if cuda:
             m_im_1 = m_im_1.cuda()
             m_im_2 = m_im_2.cuda()
-        batch["im_feats_1"] = model(m_im_1, request=img_feats)
-        batch["im_feats_2"] = model(m_im_2, request=img_feats)
+        batch["im_feats_1"] = model(m_im_1, request=img_feats)[0]
+        batch["im_feats_2"] = model(m_im_2, request=img_feats)[0]
         yield batch
 
 

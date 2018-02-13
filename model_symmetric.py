@@ -77,149 +77,198 @@ def loglikelihood(log_prob, target):
     return log_prob.gather(1, target)
 
 
-def eval_dev(dev_file, batch_size, epoch, shuffle, cuda, top_k,
-             sender, receiver, desc_dict, map_labels, file_name,
-             callback=None):
+def eval_dev(top_k, agent1, agent2, callback=None):
     """
     Function computing development accuracy
     """
 
-    desc = desc_dict["desc"]
-    desc_set = desc_dict.get("desc_set", None)
-    desc_set_lens = desc_dict.get("desc_set_lens", None)
-
     extra = dict()
 
     # Keep track of conversation lengths
-    conversation_lengths = []
+    conversation_lengths_1 = []
+    conversation_lengths_2 = []
 
     # Keep track of message diversity
-    hamming_sen = []
-    hamming_rec = []
+    hamming_1 = []
+    hamming_2 = []
 
     # Keep track of labels
     true_labels = []
-    pred_labels = []
+    pred_labels_1_nc = []
+    pred_labels_1_com = []
+    pred_labels_2_nc = []
+    pred_labels_2_com = []
 
     # Keep track of number of correct observations
     total = 0
-    correct = 0
+    total_correct_nc = 0
+    total_correct_com = 0
+    atleast1_correct_nc = 0
+    atleast1_correct_com = 0
 
     # Load development images
-    dev_loader = load_hdf5(dev_file, batch_size, epoch, shuffle,
-                           truncate_final_batch=True, map_labels=map_labels)
+    dev_loader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_eval_mode, FLAGS.dataset_size, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
 
     for batch in dev_loader:
-        # Extract images and targets
-
         target = batch["target"]
-        data = batch[FLAGS.img_feat]
+        im_feats_1 = batch["im_feats_1"]
+        im_feats_2 = batch["im_feats_2"]
+        p = batch["p"]
+        desc = batch["texts_vec"]
         _batch_size = target.size(0)
 
         true_labels.append(target.cpu().numpy().reshape(-1))
 
         # GPU support
-        if cuda:
-            data = data.cuda()
+        if FLAGS.cuda:
+            im_feats_1 = im_feats_1.cuda()
+            im_feats_2 = im_feats_2.cuda()
             target = target.cuda()
             desc = desc.cuda()
 
+        data = {"im_feats_1": im_feats_1,
+                "im_feats_2": im_feats_2,
+                "p": p}
+
         exchange_args = dict()
         exchange_args["data"] = data
-        if FLAGS.attn_extra_context:
-            exchange_args["data_context"] = batch[FLAGS.data_context]
         exchange_args["target"] = target
         exchange_args["desc"] = desc
-        exchange_args["desc_set"] = desc_set
-        exchange_args["desc_set_lens"] = desc_set_lens
-        exchange_args["train"] = False
+        exchange_args["train"] = True
         exchange_args["break_early"] = not FLAGS.fixed_exchange
-        exchange_args["corrupt"] = FLAGS.bit_flip
-        exchange_args["corrupt_region"] = FLAGS.corrupt_region
 
-        s, sen_w, rec_w, y, bs, br = exchange(
-            sender, receiver, None, None, exchange_args)
+        s, message_1, message_2, y_all, r = exchange(agent1, agent2, exchange_args)
 
-        s_masks, s_feats, s_probs = s
-        sen_feats, sen_probs = sen_w
-        rec_feats, rec_probs = rec_w
+        s_masks_1, s_feats_1, s_probs_1 = s[0]
+        s_masks_2, s_feats_2, s_probs_2 = s[1]
+        feats_1, probs_1 = message_1
+        feats_2, probs_2 = message_2
+        y_nc = y_all[0]
+        y = y_all[1]
 
-        # Mask if dynamic exchange length
+        # Mask loss if dynamic exchange length
         if FLAGS.fixed_exchange:
-            y_masks = None
+            binary_s_masks = None
+            binary_agent1_masks = None
+            binary_agent2_masks = None
+            bas_agent1_masks = None
+            bas_agent2_masks = None
+            y1_masks = None
+            y2_masks = None
+            outp_1 = y[0][-1]
+            outp_2 = y[1][-1]
         else:
-            y_masks = [torch.min(1 - m1, m2)
-                       for m1, m2 in zip(s_masks[1:], s_masks[:-1])]
+            # TODO
+            # outp_1, ent_y1 = get_outp(y[0], y1_masks)
+            # outp_2, ent_y2 = get_outp(y[1], y2_masks)
+            pass
 
-        outp, _ = get_rec_outp(y, y_masks)
-
-        # Obtain top k predictions
-        dist = F.log_softmax(outp, dim=1)
-        top_k_ind = torch.from_numpy(
-            dist.data.cpu().numpy().argsort()[:, -top_k:]).long()
-        target = target.view(-1, 1).expand(_batch_size, top_k)
+        # Obtain predictions, loss and stats agent 1
+        # Before communication predictions
+        (dist_1_nc, maxdist_1_nc, argmax_1_nc, ent_1_nc, nll_loss_1_nc, logs_1_nc) = get_classification_loss_and_stats(y_nc[0], target)
+        # After communication predictions
+        (dist_2_nc, maxdist_2_nc, argmax_2_nc, ent_2_nc, nll_loss_2_nc, logs_2_nc) = get_classification_loss_and_stats(y_nc[1], target)
+        # Obtain predictions, loss and stats agent 1
+        # Before communication predictions
+        (dist_1, maxdist_1, argmax_1, ent_1, nll_loss_1_com, logs_1) = get_classification_loss_and_stats(outp_1, target)
+        # After communication predictions
+        (dist_2, maxdist_2, argmax_2, ent_2, nll_loss_2_com, logs_2) = get_classification_loss_and_stats(outp_2, target)
 
         # Store top 1 prediction for confusion matrix
-        _, argmax = dist.data.max(1)
-        pred_labels.append(argmax.cpu().numpy())
+        pred_labels_1_nc.append(argmax_1_nc.cpu().numpy())
+        pred_labels_1_com.append(argmax_1.cpu().numpy())
+        pred_labels_2_nc.append(argmax_2_nc.cpu().numpy())
+        pred_labels_2_com.append(argmax_2.cpu().numpy())
+
+        # Calculate number of correct observations for different types
+        accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc)
+        accuracy_1, correct_1 = calculate_accuracy(dist_1)
+        accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc)
+        accuracy_2, correct_2 = calculate_accuracy(dist_2)
+        total_correct_nc = correct_1_nc + correct_2_nc
+        total_correct_com = correct_1 + correct_2
 
         # Update accuracy counts
-        total += float(batch_size)
-        correct += (top_k_ind == target.cpu()).sum()
+        total += float(_batch_size)
+        total_correct_nc += (total_correct_nc == 2).sum()
+        total_correct_com += (total_correct_com == 2).sum()
+        atleast1_correct_nc += (total_correct_nc > 0).sum()
+        atleast1_correct_com += (total_correct_com > 0).sum()
 
         # Keep track of conversation lengths
-        conversation_lengths += torch.cat(s_feats,
-                                          1).data.float().sum(1).view(-1).tolist()
+        conversation_lengths_1 += torch.cat(feats_1, 1).data.float().sum(1).view(-1).tolist()
+        conversation_lengths_2 += torch.cat(feats_2, 1).data.float().sum(1).view(-1).tolist()
 
         # Keep track of message diversity
-        mean_hamming_rec = 0
-        mean_hamming_sen = 0
-        prev_rec = torch.FloatTensor(_batch_size, FLAGS.rec_w_dim).fill_(0)
-        prev_sen = torch.FloatTensor(_batch_size, FLAGS.rec_w_dim).fill_(0)
+        mean_hamming_1 = 0
+        mean_hamming_2 = 0
+        prev_1 = torch.FloatTensor(_batch_size, FLAGS.m_dim).fill_(0)
+        prev_2 = torch.FloatTensor(_batch_size, FLAGS.m_dim).fill_(0)
 
-        for msg in sen_feats:
-            mean_hamming_sen += (msg.data.cpu() - prev_sen).abs().sum(1).mean()
-            prev_sen = msg.data.cpu()
-        mean_hamming_sen = mean_hamming_sen / float(len(sen_feats))
+        for msg in feats_1:
+            mean_hamming_1 += (msg.data.cpu() - prev_1).abs().sum(1).mean()
+            prev_1 = msg.data.cpu()
+        mean_hamming_1 = mean_hamming_1 / float(len(feats_1))
 
-        for msg in rec_feats:
-            mean_hamming_rec += (msg.data.cpu() - prev_rec).abs().sum(1).mean()
-            prev_rec = msg.data.cpu()
-        mean_hamming_rec = mean_hamming_rec / float(len(rec_feats))
+        for msg in feats_2:
+            mean_hamming_2 += (msg.data.cpu() - prev_2).abs().sum(2).mean()
+            prev_2 = msg.data.cpu()
+        mean_hamming_2 = mean_hamming_2 / float(len(feats_2))
 
-        hamming_sen.append(mean_hamming_sen)
-        hamming_rec.append(mean_hamming_rec)
+        hamming_1.append(mean_hamming_1)
+        hamming_2.append(mean_hamming_2)
 
         if callback is not None:
             callback_dict = dict(
-                s_masks=s_masks,
-                s_feats=s_feats,
-                s_probs=s_probs,
-                sen_feats=sen_feats,
-                sen_probs=sen_probs,
-                rec_feats=rec_feats,
-                rec_probs=rec_probs,
+                s_masks_1=s_masks_1,
+                s_feats_1=s_feats_1,
+                s_probs_1=s_probs_1,
+                s_masks_2=s_masks_2,
+                s_feats_2=s_feats_2,
+                s_probs_2=s_probs_2,
+                feats_1=feats_1,
+                feats_2=feats_2,
+                probs_1=probs_1,
+                probs_2=probs_2,
+                y_nc=y_nc,
                 y=y)
-            callback(sender, receiver, batch, callback_dict)
+            callback(agent1, agent2, batch, callback_dict)
 
     # Print confusion matrix
     true_labels = np.concatenate(true_labels).reshape(-1)
-    pred_labels = np.concatenate(pred_labels).reshape(-1)
+    pred_labels_1_nc = np.concatenate(pred_labels_1_nc).reshape(-1)
+    pred_labels_1_com = np.concatenate(pred_labels_1_com).reshape(-1)
+    pred_labels_2_nc = np.concatenate(pred_labels_2_nc).reshape(-1)
+    pred_labels_2_com = np.concatenate(pred_labels_2_com).reshape(-1)
 
-    np.savetxt(FLAGS.conf_mat, confusion_matrix(
-        true_labels, pred_labels), delimiter=',', fmt='%d')
+    np.savetxt(FLAGS.conf_mat + "_1_nc", confusion_matrix(
+        true_labels, pred_labels_1_nc), delimiter=',', fmt='%d')
+    np.savetxt(FLAGS.conf_mat + "_1_com", confusion_matrix(
+        true_labels, pred_labels_1_com), delimiter=',', fmt='%d')
+    np.savetxt(FLAGS.conf_mat + "_2_nc", confusion_matrix(
+        true_labels, pred_labels_2_nc), delimiter=',', fmt='%d')
+    np.savetxt(FLAGS.conf_mat + "_2_com", confusion_matrix(
+        true_labels, pred_labels_2_com), delimiter=',', fmt='%d')
 
     # Compute statistics
-    conversation_lengths = np.array(conversation_lengths)
-    hamming_sen = np.array(hamming_sen)
-    hamming_rec = np.array(hamming_rec)
-    extra['conversation_lengths_mean'] = conversation_lengths.mean()
-    extra['conversation_lengths_std'] = conversation_lengths.std()
-    extra['hamming_sen_mean'] = hamming_sen.mean()
-    extra['hamming_rec_mean'] = hamming_rec.mean()
+    conversation_lengths_1 = np.array(conversation_lengths_1)
+    conversation_lengths_2 = np.array(conversation_lengths_2)
+    hamming_1 = np.array(hamming_1)
+    hamming_2 = np.array(hamming_2)
+    extra['conversation_lengths_1_mean'] = conversation_lengths_1.mean()
+    extra['conversation_lengths_1_std'] = conversation_lengths_1.std()
+    extra['conversation_lengths_2_mean'] = conversation_lengths_2.mean()
+    extra['conversation_lengths_2_std'] = conversation_lengths_2.std()
+    extra['hamming_1_mean'] = hamming_1.mean()
+    extra['hamming_2_mean'] = hamming_2.mean()
+
+    total_accuracy_nc = total_correct_nc / total
+    total_accuracy_com = total_correct_com / total
+    atleast1_accuracy_nc = atleast1_correct_nc / total
+    atleast1_accuracy_com = atleast1_correct_com / total
 
     # Return accuracy
-    return correct / total, extra
+    return total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra
 
 
 def corrupt_message(corrupt_region, agent, binary_message):
@@ -243,8 +292,7 @@ def exchange(agent1, agent2, exchange_args):
               image each agent received
               e.g.  { "im_feats_1": im_feats_1,
                       "im_feats_2": im_feats_2,
-                      "p_1": p_1,
-                      "p_2": p_2}
+                      "p": p}
         target: Class labels.
         desc: List of description vectors.
         train: Boolean value indicating training mode (True) or evaluation mode (False).
@@ -738,23 +786,26 @@ def run():
     if FLAGS.eval_only:
         if not os.path.exists(FLAGS.checkpoint):
             raise Exception("Must provide valid checkpoint.")
-        # TODO fix for new agents
-        dev_acc, extra = eval_dev(FLAGS.dev_file, FLAGS.batch_size_dev, epoch,
-                                  FLAGS.shuffle_dev, FLAGS.cuda, FLAGS.top_k_dev,
-                                  sender, receiver, desc_dev_dict, map_labels_dev, FLAGS.experiment_name)
-        flogger.Log("Dev Accuracy: " + str(dev_acc))
+        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(FLAGS.top_k_dev, agent1, agent2, callback=None)
+        flogger.Log("Dev Accuracy no comms, both right: " + str(total_accuracy_nc))
+        flogger.Log("Dev Accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
+        flogger.Log("Dev Accuracy after comms, both right: " + str(total_accuracy_com))
+        flogger.Log("Dev Accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
         with open(FLAGS.eval_csv_file, 'w') as f:
             f.write(
-                "checkpoint,eval_file,topk,step,best_dev_acc,eval_acc,convlen_mean,convlen_std\n")
+                "checkpoint,eval_file,topk,step,best_dev_acc,eval_acc_nc_2,eval_acc_nc_1,eval_acc_com_2,eval_acc_com_1,convlen_1_mean,convlen_1_std,convlen_2_mean,convlen_2_std\n")
             f.write("{},{},{},{},{},{},{},{}\n".format(
                 FLAGS.checkpoint, FLAGS.dev_file, FLAGS.top_k_dev,
-                step, best_dev_acc, dev_acc,
-                extra['conversation_lengths_mean'], extra['conversation_lengths_std']))
+                step, best_dev_acc, total_accuracy_nc, atleast1_accuracy_nc, total_accuracy_com, atleast1_accuracy_com,
+                extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std'],
+                extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
         sys.exit()
     elif FLAGS.binary_only:
         if not os.path.exists(FLAGS.checkpoint):
             raise Exception("Must provide valid checkpoint.")
         # TODO fix for new agents
+        debuglogger.warning(f'Extract binary not updated for new agents yet')
+        sys.exit()
         extract_binary(FLAGS, load_hdf5, exchange, FLAGS.dev_file, FLAGS.batch_size_dev, epoch,
                        FLAGS.shuffle_dev, FLAGS.cuda, FLAGS.top_k_dev,
                        sender, receiver, desc_dev_dict, map_labels_dev, FLAGS.experiment_name)
@@ -767,7 +818,7 @@ def run():
 
         # Read dataset randomly into batches
         if FLAGS.dataset == "shapeworld":
-            dataloader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_mode, FLAGS.dataset_size, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
+            dataloader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_mode, FLAGS.dataset_size, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size, FLAGS.random_seed, FLAGS.shuffle_train, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
         else:
             raise NotImplementedError
 
@@ -784,35 +835,35 @@ def run():
                           'agent1_com': [],  # after communicaton
                           'agent2_com': []  # after communicaton
                           }
-        dev_accuracy = {'total_nc': [],  # no communicaton
-                        'total_com': [],  # after communication
-                        'rewards': [],  # total_com - total_nc
-                        'total_acc_both_nc': []  # % both agents right before comms
+        dev_accuracy = {'total_acc_both_nc': []  # % both agents right before comms
                         'total_acc_both_com': []  # % both agents right after comms
                         'total_acc_atl1_nc': []  # % at least 1 agent right before comms
                         'total_acc_atl1_com': []  # % at least 1 agent right after comms
-                        'agent1_nc': [],  # no communicaton
-                        'agent2_nc': [],  # no communicaton
-                        'agent1_com': [],  # after communicaton
-                        'agent2_com': []  # after communicaton
                         }
 
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
             target = batch["target"]
-            data = batch[FLAGS.img_feat]
-            desc = batch["text_descriptions"]
+            im_feats_1 = batch["im_feats_1"]
+            im_feats_2 = batch["im_feats_2"]
+            p = batch["p"]
+            desc = batch["texts_vec"]
 
             # GPU support
             if FLAGS.cuda:
-                data = data.cuda()
+                im_feats_1 = im_feats_1.cuda()
+                im_feats_2 = im_feats_2.cuda()
                 target = target.cuda()
-                desc_train = desc_train.cuda()
+                desc = desc.cuda()
+
+            data = {"im_feats_1": im_feats_1,
+                    "im_feats_2": im_feats_2,
+                    "p": p}
 
             exchange_args = dict()
             exchange_args["data"] = data
             exchange_args["target"] = target
-            exchange_args["desc"] = desc_train
+            exchange_args["desc"] = desc
             exchange_args["train"] = True
             exchange_args["break_early"] = not FLAGS.fixed_exchange
 
@@ -1078,40 +1129,46 @@ def run():
                            val=avg_batch_acc_atl1_com, step=step)
 
             # Report development accuracy
-            # HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!
             if step % FLAGS.log_dev == 0:
-                # TODO - fix for symmetric agents
-                dev_acc, extra = eval_dev(FLAGS.dev_file, FLAGS.batch_size_dev, epoch,
-                                          FLAGS.shuffle_dev, FLAGS.cuda, FLAGS.top_k_dev,
-                                          sender, receiver, desc_dev_dict, map_labels_dev, FLAGS.experiment_name)
-                dev_accuracy.append(dev_acc)
-                logger.log(key="Development Accuracy",
-                           val=dev_accuracy[-1], step=step)
-                logger.log(key="Conversation Length (avg)",
-                           val=extra['conversation_lengths_mean'], step=step)
-                logger.log(key="Conversation Length (std)",
-                           val=extra['conversation_lengths_std'], step=step)
-                logger.log(key="Hamming Receiver (avg)",
-                           val=extra['hamming_rec_mean'], step=step)
-                logger.log(key="Hamming Sender (avg)",
-                           val=extra['hamming_sen_mean'], step=step)
+                total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(FLAGS.top_k_dev, agent1, agent2, callback=None)
+                dev_accuracy['total_acc_both_nc'].append(total_accuracy_nc)
+                dev_accuracy['total_acc_both_com'].append(total_accuracy_com)
+                dev_accuracy['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
+                dev_accuracy['total_acc_atl1_com'].append(atleast1_accuracy_com)
+                logger.log(key="Development Accuracy, both right, no comms", val=dev_accuracy['total_acc_both_nc'][-1], step=step)
+                logger.log(key="Development Accuracy, both right, after comms", val=dev_accuracy['total_acc_both_com'][-1], step=step)
+                logger.log(key="Development Accuracy, at least 1 right, no comms", val=dev_accuracy['total_acc_atl1_nc'][-1], step=step)
+                logger.log(key="Development Accuracy, at least 1 right, after comms", val=dev_accuracy['total_acc_atl1_com'][-1], step=step)
+                logger.log(key="Conversation Length A1 (avg)",
+                           val=extra['conversation_lengths_1_mean'], step=step)
+                logger.log(key="Conversation Length A1 (std)",
+                           val=extra['conversation_lengths_1_std'], step=step)
+                logger.log(key="Conversation Length A2 (avg)",
+                           val=extra['conversation_lengths_2_mean'], step=step)
+                logger.log(key="Conversation Length A2 (std)",
+                           val=extra['conversation_lengths_2_std'], step=step)
+                logger.log(key="Hamming 1 (avg)",
+                           val=extra['hamming_1_mean'], step=step)
+                logger.log(key="Hamming 2 (avg)",
+                           val=extra['hamming_2_mean'], step=step)
 
-                flogger.Log("Epoch: {} Step: {} Batch: {} Development Accuracy: {}"
-                            .format(epoch, step, i_batch, dev_accuracy[-1]))
-                flogger.Log("Epoch: {} Step: {} Batch: {} Conversation Length (avg/std): {}/{}"
-                            .format(epoch, step, i_batch,
-                                    extra['conversation_lengths_mean'],
-                                    extra['conversation_lengths_std']))
-                flogger.Log("Epoch: {} Step: {} Batch: {} Mean Hamming Distance (R/S): {}/{}"
-                            .format(epoch, step, i_batch, extra['hamming_rec_mean'], extra['hamming_sen_mean']))
-                if step >= FLAGS.save_after and dev_acc > best_dev_acc:
-                    best_dev_acc = dev_acc
+                flogger.Log("Epoch: {} Step: {} Batch: {} Development Accuracy, both right, no comms: {}".format(epoch, step, i_batch, dev_accuracy['total_acc_both_nc'][-1]))
+                flogger.Log("Epoch: {} Step: {} Batch: {} Development Accuracy, both right, after comms: {}".format(epoch, step, i_batch, dev_accuracy['total_acc_both_com'][-1]))
+                flogger.Log("Epoch: {} Step: {} Batch: {} Development Accuracy, at least right, no comms: {}".format(epoch, step, i_batch, dev_accuracy['total_acc_atl1_nc'][-1]))
+                flogger.Log("Epoch: {} Step: {} Batch: {} Development Accuracy, at least 1 right, after comms: {}".format(epoch, step, i_batch, dev_accuracy['total_acc_atl1_com'][-1]))
+
+                flogger.Log("Epoch: {} Step: {} Batch: {} Conversation Length 1 (avg/std): {}/{}".format(epoch, step, i_batch, extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std']))
+                flogger.Log("Epoch: {} Step: {} Batch: {} Conversation Length 2 (avg/std): {}/{}".format(epoch, step, i_batch, extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
+
+                flogger.Log("Epoch: {} Step: {} Batch: {} Mean Hamming Distance (1/2): {}/{}"
+                            .format(epoch, step, i_batch, extra['hamming_1_mean'], extra['hamming_2_mean']))
+                if step >= FLAGS.save_after and total_accuracy_com > best_dev_acc:
+                    best_dev_acc = total_accuracy_com
                     flogger.Log(
-                        "Checkpointing with best Development Accuracy: {}".format(best_dev_acc))
+                        "Checkpointing with best Development Accuracy (both right after comms): {}".format(best_dev_acc))
                     # Optionally store additional information
                     data = dict(step=step, best_dev_acc=best_dev_acc)
-                    torch_save(FLAGS.checkpoint + "_best", data, models_dict,
-                               optimizers_dict, gpu=0 if FLAGS.cuda else -1)
+                    torch_save(FLAGS.checkpoint + "_best", data, models_dict, optimizers_dict, gpu=0 if FLAGS.cuda else -1)
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:
@@ -1123,11 +1180,11 @@ def run():
 
             # Increment batch step
             step += 1
-            # break
+            break
 
         # Increment epoch
         epoch += 1
-        # break
+        break
 
     flogger.Log("Finished training.")
 
@@ -1214,14 +1271,10 @@ def flags():
     gflags.DEFINE_integer("wv_dim", 100, "")
     gflags.DEFINE_string("dataset_path", "./Shapeworld/data/oneshape_simple_textselect", "")
     gflags.DEFINE_string("dataset_mode", "train", "")
+    gflags.DEFINE_string("dataset_eval_mode", "valid", "")
     gflags.DEFINE_string("dataset_type", "agreement", "")
     gflags.DEFINE_string("dataset_name", "oneshape_simple_textselect", "")
     gflags.DEFINE_integer("dataset_size", 100, "")
-    # gflags.DEFINE_string("descr_train", "descriptions.csv", "")
-    # gflags.DEFINE_string("descr_dev", "descriptions.csv", "")
-    # gflags.DEFINE_string("train_file", "train.hdf5", "")
-    # gflags.DEFINE_string("dev_file", "dev.hdf5", "")
-    # gflags.DEFINE_enum("images", "mammal", ["cifar", "mammal"], "")
     gflags.DEFINE_string(
         "glove_path", "./glove.6B/glove.6B.100d.txt", "")
     gflags.DEFINE_boolean("shuffle_train", True, "")

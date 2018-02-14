@@ -239,6 +239,8 @@ class RewardEstimator(nn.Module):
         reset_parameters_util(self)
 
     def forward(self, x):
+        # Detach input from rest of graph - only want gradients to flow through the RewardEstimator and no future
+        x = x.detach()
         x = F.relu(self.v1(x))
         x = self.v2(x)
         return x
@@ -303,9 +305,33 @@ class Agent(nn.Module):
 
         """
         self.h_z = None
+        self.image_processor.reset_state()
 
     def initial_state(self, batch_size):
         return _Variable(torch.zeros(batch_size, self.h_dim))
+
+    def predict_classes(self, h_c, desc_proc):
+        '''
+        Scores each class using an MLP
+        desc_proc:    bs x num_classes x hid_dim
+        h_c:          bs x hid_dim
+        hid_cat_desc: (bs x num_classes) x (hid_dim * 2)
+        '''
+        # TODO add option for dot product or MLP (not just MLP)
+        h_c_expand = torch.unsqueeze(
+            h_c, dim=1).expand(-1, self.num_classes, -1)
+        debuglogger.debug(f'h_c_expand: {h_c_expand.size()}')
+        debuglogger.debug(f'h_c: {h_c}')
+        debuglogger.debug(f'h_c_expand: {h_c_expand}')
+        hid_cat_desc = torch.cat([h_c_expand, desc_proc], dim=2)
+        debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
+        hid_cat_desc = hid_cat_desc.view(-1, self.h_dim * 2)
+        debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
+        y = F.relu(self.y1(hid_cat_desc))
+        debuglogger.debug(f'y: {y.size()}')
+        y = self.y2(y).view(batch_size, -1)
+        debuglogger.debug(f'y: {y.size()}')
+        return y
 
     def forward(self, x, m, t, desc, use_message, batch_size, training):
         """
@@ -399,29 +425,13 @@ class Agent(nn.Module):
                 (rand_num < prob_).astype('float32')))
         else:
             # Infer decisions
-            # TODO check re. old implementation
             s_binary = torch.round(s_prob).detach()
         debuglogger.debug(f'stop decisions: {s_binary.size()}')
         debuglogger.debug(f'stop decisions: {s_binary}')
 
         # Predict classes
-        # desc_proc:    bs x num_classes x hid_dim
-        # h_c:  bs x hid_dim
-        # hid_cat_desc: (bs x num_classes) x (hid_dim * 2)
-        h_c_expand = torch.unsqueeze(
-            h_c, dim=1).expand(-1, self.num_classes, -1)
-        debuglogger.debug(f'h_c_expand: {h_c_expand.size()}')
-        debuglogger.debug(f'h_c: {h_c}')
-        debuglogger.debug(f'h_c_expand: {h_c_expand}')
-        hid_cat_desc = torch.cat([h_c_expand, desc_proc], dim=2)
-        debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
-        hid_cat_desc = hid_cat_desc.view(-1, self.h_dim * 2)
-        debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
-        y = F.relu(self.y1(hid_cat_desc))
-        debuglogger.debug(f'y: {y.size()}')
-        y = self.y2(y).view(batch_size, -1)
-        debuglogger.debug(f'y: {y.size()}')
         # y: batch_size * num_classes
+        y = self.predict_classes(h_c, desc_proc)
         y_scores = F.softmax(y, dim=1).detach()
         debuglogger.debug(f'y_scores: {y_scores.size()}')
         debuglogger.debug(f'y_scores: {y_scores}')

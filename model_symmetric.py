@@ -174,23 +174,35 @@ def eval_dev(top_k, agent1, agent2, callback=None):
         pred_labels_2_com.append(argmax_2.cpu().numpy())
 
         # Calculate number of correct observations for different types
-        accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc, target)
-        accuracy_1, correct_1 = calculate_accuracy(dist_1, target)
-        accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc, target)
-        accuracy_2, correct_2 = calculate_accuracy(dist_2, target)
-        total_correct_nc = correct_1_nc + correct_2_nc
-        total_correct_com = correct_1 + correct_2
+        accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_1, correct_1 = calculate_accuracy(dist_1, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_2, correct_2 = calculate_accuracy(dist_2, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        batch_correct_nc = correct_1_nc.float() + correct_2_nc.float()
+        batch_correct_com = correct_1.float() + correct_2.float()
+
+        debuglogger.debug(f'eval batch correct com: {batch_correct_com}')
+        debuglogger.debug(f'eval batch correct nc: {batch_correct_nc}')
 
         # Update accuracy counts
         total += float(_batch_size)
-        total_correct_nc += (total_correct_nc == 2).sum()
-        total_correct_com += (total_correct_com == 2).sum()
-        atleast1_correct_nc += (total_correct_nc > 0).sum()
-        atleast1_correct_com += (total_correct_com > 0).sum()
+        total_correct_nc += (batch_correct_nc == 2).sum()
+        total_correct_com += (batch_correct_com == 2).sum()
+        atleast1_correct_nc += (batch_correct_nc > 0).sum()
+        atleast1_correct_com += (batch_correct_com > 0).sum()
+
+        debuglogger.debug(f'eval total correct com: {total_correct_com}')
+        debuglogger.debug(f'eval total correct nc: {total_correct_nc}')
+        debuglogger.debug(f'eval atleast1 correct com: {atleast1_correct_com}')
+        debuglogger.debug(f'eval atleast1 correct nc: {atleast1_correct_nc}')
 
         # Keep track of conversation lengths
-        conversation_lengths_1 += torch.cat(feats_1, 1).data.float().sum(1).view(-1).tolist()
-        conversation_lengths_2 += torch.cat(feats_2, 1).data.float().sum(1).view(-1).tolist()
+        # TODO not relavant yet
+        conversation_lengths_1 += torch.cat(s_feats_1, 1).data.float().sum(1).view(-1).tolist()
+        conversation_lengths_2 += torch.cat(s_feats_2, 1).data.float().sum(1).view(-1).tolist()
+
+        debuglogger.debug(f'Conversation length 1: {conversation_lengths_1}')
+        debuglogger.debug(f'Conversation length 2: {conversation_lengths_2}')
 
         # Keep track of message diversity
         mean_hamming_1 = 0
@@ -204,7 +216,7 @@ def eval_dev(top_k, agent1, agent2, callback=None):
         mean_hamming_1 = mean_hamming_1 / float(len(feats_1))
 
         for msg in feats_2:
-            mean_hamming_2 += (msg.data.cpu() - prev_2).abs().sum(2).mean()
+            mean_hamming_2 += (msg.data.cpu() - prev_2).abs().sum(1).mean()
             prev_2 = msg.data.cpu()
         mean_hamming_2 = mean_hamming_2 / float(len(feats_2))
 
@@ -256,6 +268,7 @@ def eval_dev(top_k, agent1, agent2, callback=None):
     extra['hamming_1_mean'] = hamming_1.mean()
     extra['hamming_2_mean'] = hamming_2.mean()
 
+    debuglogger.debug(f'Eval total size: {total}')
     total_accuracy_nc = total_correct_nc / total
     total_accuracy_com = total_correct_com / total
     atleast1_accuracy_nc = atleast1_correct_nc / total
@@ -445,10 +458,10 @@ def exchange(agent1, agent2, exchange_args):
         stop_feat_2.append(s_binary_2)
         stop_prob_1.append(s_prob_1)
         stop_prob_2.append(s_prob_2)
-        feats_1.append(s_binary_1)
-        feats_2.append(s_binary_2)
-        probs_1.append(s_prob_1)
-        probs_2.append(s_prob_2)
+        feats_1.append(m_binary_1)
+        feats_2.append(m_binary_2)
+        probs_1.append(m_probs_1)
+        probs_2.append(m_probs_2)
         y_1.append(y_1e)
         y_2.append(y_2e)
         r_1.append(r_1e)
@@ -509,6 +522,7 @@ def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
         torch.log(1 - binary_probs + 1e-8)
     log_p_z = log_p_z.sum(1)
     weight = Variable(rewards) - Variable(baseline_rewards.clone().detach().data)
+    # debuglogger.debug(f'Reinforcement weight: {weight.data}')
     if rewards.size(0) > 1:  # Ensures weights are not larger than 1
         weight = weight / np.maximum(1., torch.std(weight.data))
     loss = torch.mean(-1 * weight * log_p_z)
@@ -596,13 +610,12 @@ def bin_to_alpha(binary):
     return " ".join(ret)
 
 
-def calculate_accuracy(prediction_dist, target, mode='train'):
-    # TODO FIX
-    assert (FLAGS.batch_size == target.size(0)) or (FLAGS.batch_size_dev == target.size(0))
-    target_exp = target.view(-1, 1).expand(FLAGS.batch_size, FLAGS.top_k_train)
-    top_k_ind = torch.from_numpy(prediction_dist.data.cpu().numpy().argsort()[:, -FLAGS.top_k_train:]).long()
+def calculate_accuracy(prediction_dist, target, batch_size, top_k):
+    assert batch_size == target.size(0)
+    target_exp = target.view(-1, 1).expand(batch_size, top_k)
+    top_k_ind = torch.from_numpy(prediction_dist.data.cpu().numpy().argsort()[:, -top_k:]).long()
     correct = (top_k_ind == target_exp.cpu()).sum(dim=1)
-    accuracy = correct.sum() / float(FLAGS.batch_size)
+    accuracy = correct.sum() / float(batch_size)
     return accuracy, correct
 
 
@@ -679,7 +692,7 @@ def get_classification_loss_and_stats(predictions, targets):
     maxdist, argmax = dist.data.max(1)
     probs = F.softmax(predictions, dim=1)
     ent = (torch.log(probs + 1e-8) * probs).sum(1).mean()
-    debuglogger.debug(f'Mean entropy: {ent.data[0]}')
+    debuglogger.debug(f'Mean entropy: {-ent.data[0]}')
     nll_loss = nn.NLLLoss()(dist, Variable(targets))
     logs = loglikelihood(Variable(dist.data),
                          Variable(targets.view(-1, 1)))
@@ -912,14 +925,14 @@ def run():
                 ent_agent2_y = []
 
             # Calculate accuracy
-            accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc, target)
-            accuracy_1, correct_1 = calculate_accuracy(dist_1, target)
-            accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc, target)
-            accuracy_2, correct_2 = calculate_accuracy(dist_2, target)
+            accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_1, correct_1 = calculate_accuracy(dist_1, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_2, correct_2 = calculate_accuracy(dist_2, target, FLAGS.batch_size, FLAGS.top_k_train)
 
             # Calculate rewards
-            total_correct_nc = correct_1_nc + correct_2_nc
-            total_correct_com = correct_1 + correct_2
+            total_correct_nc = correct_1_nc.float() + correct_2_nc.float()
+            total_correct_com = correct_1.float() + correct_2.float()
             total_accuracy_nc = (total_correct_nc == 2).sum() / float(FLAGS.batch_size)
             total_accuracy_com = (total_correct_com == 2).sum() / float(FLAGS.batch_size)
             atleast1_accuracy_nc = (total_correct_nc > 0).sum() / float(FLAGS.batch_size)
@@ -1055,16 +1068,16 @@ def run():
                         flogger.Log(log_ent_agent2_bin)
 
                 if len(ent_agent1_y) > 0:
-                    log_ent_agent1_y = "Entropy Agent1 Predictions"
-                    log_ent_agent1_y += "No comms entropy {}\n Comms entropy\n".format(ent_1_nc.data[0])
+                    log_ent_agent1_y = "Entropy Agent1 Predictions\n"
+                    log_ent_agent1_y += "No comms entropy {}\n Comms entropy\n".format(-ent_1_nc.data[0])
                     for i, ent in enumerate(ent_agent1_y):
                         log_ent_agent1_y += "\n{}. {}".format(i, -ent.data[0])
                     log_ent_agent1_y += "\n"
                     flogger.Log(log_ent_agent1_y)
 
                 if len(ent_agent2_y) > 0:
-                    log_ent_agent2_y = "Entropy Agent2 Predictions"
-                    log_ent_agent2_y += "No comms entropy {}\n Comms entropy\n".format(ent_2_nc.data[0])
+                    log_ent_agent2_y = "Entropy Agent2 Predictions\n"
+                    log_ent_agent2_y += "No comms entropy {}\n Comms entropy\n".format(-ent_2_nc.data[0])
                     for i, ent in enumerate(ent_agent2_y):
                         log_ent_agent2_y += "\n{}. {}".format(i, -ent.data[0])
                     log_ent_agent2_y += "\n"

@@ -1,6 +1,12 @@
 # MultimodalGame
 
+> To be updated
+
 Source code for [Emergent Communication in a Multi-Modal, Multi-Step Referential Game](https://arxiv.org/abs/1705.10369).
+
+## Installing
+
+git clone --recurse-submodules https://github.com/lgraesser/MultimodalGame.git
 
 ## Dependencies
 
@@ -40,7 +46,7 @@ python model.py \
 -learning_rate 1e-4 \ # learning rate for gradient descent
 -entropy_rec 0.01 \ # regularize the receiver's messages
 -entropy_sen 0.01 \ # regularize the sender's messages
--entropy_s 0.08 \ # regularize the stop bit 
+-entropy_s 0.08 \ # regularize the stop bit
 -use_binary \ # specify binary communication (continuous values are also an option)
 -max_epoch 500 \ # number of epochs to train
 -top_k_dev 6 \ # specify tok-k for dev

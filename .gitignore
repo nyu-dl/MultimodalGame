@@ -6,3 +6,6 @@ logs
 *.pyc
 urls
 .ipynb_checkpoints
+glove.6B
+utils/fall11_urls.txt
+utils/imagenet_fall11_urls.tgz

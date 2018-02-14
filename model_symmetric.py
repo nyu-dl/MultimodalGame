@@ -100,7 +100,7 @@ def eval_dev(top_k, agent1, agent2, callback=None):
     atleast1_correct_com = 0
 
     # Load development images
-    dev_loader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_eval_mode, FLAGS.dataset_size, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
+    dev_loader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_eval_mode, FLAGS.dataset_size_dev, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
 
     for batch in dev_loader:
         target = batch["target"]
@@ -242,7 +242,7 @@ def eval_dev(top_k, agent1, agent2, callback=None):
                 y_nc=y_nc,
                 y=y)
             callback(agent1, agent2, batch, callback_dict)
-        break
+        # break
 
     # Print confusion matrix
     true_labels = np.concatenate(true_labels).reshape(-1)
@@ -833,7 +833,7 @@ def run():
 
         # Read dataset randomly into batches
         if FLAGS.dataset == "shapeworld":
-            dataloader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_mode, FLAGS.dataset_size, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size, FLAGS.random_seed, FLAGS.shuffle_train, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
+            dataloader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_mode, FLAGS.dataset_size_train, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size, FLAGS.random_seed, FLAGS.shuffle_train, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
         else:
             raise NotImplementedError
 
@@ -1205,11 +1205,11 @@ def run():
 
             # Increment batch step
             step += 1
-            break
+            # break
 
         # Increment epoch
         epoch += 1
-        break
+        # break
 
     flogger.Log("Finished training.")
 
@@ -1300,7 +1300,8 @@ def flags():
     gflags.DEFINE_enum("dataset_eval_mode", "validation", ["validation", "test"], "")
     gflags.DEFINE_string("dataset_type", "agreement", "Task type")
     gflags.DEFINE_string("dataset_name", "oneshape_simple_textselect", "Name of dataset (should correspond to the root directory name automatically generated using ShapeWorld generate.py)")
-    gflags.DEFINE_integer("dataset_size", 100, "How many examples to use")
+    gflags.DEFINE_integer("dataset_size_train", 100, "How many examples to use")
+    gflags.DEFINE_integer("dataset_size_dev", 100, "How many examples to use")
     gflags.DEFINE_string(
         "glove_path", "./glove.6B/glove.6B.100d.txt", "")
     gflags.DEFINE_boolean("shuffle_train", True, "")

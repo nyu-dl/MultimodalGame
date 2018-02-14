@@ -29,19 +29,12 @@ from misc import xavier_normal
 from misc import build_mask
 
 from dataset_loader import load_shapeworld_dataset
+from binary_vectors import extract_binary
 
 from sparks import sparks
 
-from binary_vectors import extract_binary
-
 import gflags
-
 FLAGS = gflags.FLAGS
-
-FORMAT = '[%(asctime)s %(levelname)s] %(message)s'
-logging.basicConfig(format=FORMAT)
-debuglogger = logging.getLogger('main_logger')
-debuglogger.setLevel('INFO')
 
 
 def Variable(*args, **kwargs):
@@ -284,7 +277,9 @@ def corrupt_message(corrupt_region, agent, binary_message):
 def exchange(agent1, agent2, exchange_args):
     """Run a batched conversation between two agents.
 
-    # TODO - explain
+    There are two parts to an exchange:
+        1. Each agent receives part of an image, and uses this to select the corresponding text from a selection of texts
+        2. Agents communicate for a number of steps, then each select the corresponding text again from the same selection of texts
 
     Exchange Args:
         data: Image features
@@ -297,11 +292,13 @@ def exchange(agent1, agent2, exchange_args):
         desc: List of description vectors.
         train: Boolean value indicating training mode (True) or evaluation mode (False).
         break_early: Boolean value. If True, then terminate batched conversation if both agents are satisfied
-    Args:
+
+    Function Args:
         agent1: agent1
         agent2: agent2
         exchange_args: Other useful arguments.
-    Output:
+
+    Returns:
         s: All STOP bits. (Masks, Values, Probabilities)
         w_1: All agent_1 messages. (Values, Probabilities)
         w_2: All agent_2 messages. (Values, Probabilities)
@@ -312,7 +309,6 @@ def exchange(agent1, agent2, exchange_args):
     """
 
     data = exchange_args["data"]
-    data_context = None
     target = exchange_args["target"]
     desc = exchange_args["desc"]
     train = exchange_args["train"]
@@ -340,9 +336,10 @@ def exchange(agent1, agent2, exchange_args):
     r_1 = []
     r_2 = []
 
-    # First message
-    m_binary = Variable(torch.FloatTensor(batch_size, agent_1.m_dim).fill_(
-        FLAGS.first_msg), volatile=not train)
+    # First message (default is 0)
+    m_binary = Variable(torch.FloatTensor(batch_size, agent_1.m_dim).fill_(FLAGS.first_msg), volatile=not train)
+    if FLAGS.cuda:
+        m_binary = m_binary.cuda()
 
     if train:
         agent_1.train()
@@ -357,24 +354,25 @@ def exchange(agent1, agent2, exchange_args):
     # The message is ignored initially
     use_message = False
     # Run data through both agents
-    # No data context at the moment - # TODO
     if data_context is not None:
-        pass
+        # No data context at the moment - # TODO
+        debuglogger.warning(f'Data context not supported currently')
+        sys.exit()
     else:
         s_1e, m_1e, y_1e, r_1e = agent_1(
-            Variable(data['im_feats_1'], volatile=not train),
-            Variable(m_binary.data, volatile=not train),
+            data['im_feats_1'],
+            m_binary,
             0,
-            Variable(desc.data, volatile=not train),
+            desc,
             use_message,
             batch_size,
             train)
 
         s_2e, m_2e, y_2e, r_2e = agent_2(
-            Variable(data['im_feats_2'], volatile=not train),
-            Variable(m_binary.data, volatile=not train),
+            data['im_feats_2'],
+            m_binary,
             0,
-            Variable(desc.data, volatile=not train),
+            desc,
             use_message,
             batch_size,
             train)
@@ -398,13 +396,15 @@ def exchange(agent1, agent2, exchange_args):
 
         # Run data through agent 2
         if data_context is not None:
-            pass
+            # TODO
+            debuglogger.warning(f'Data context not supported currently')
+            sys.exit()
         else:
             s_2e, m_2e, y_2e, r_2e = agent_2(
-                Variable(data['im_feats_2'], volatile=not train),
-                Variable(m_1e_binary.data, volatile=not train),
+                data['im_feats_2'],
+                m_1e_binary,
                 i_exchange,
-                Variable(desc.data, volatile=not train),
+                desc,
                 use_message,
                 batch_size,
                 train)
@@ -421,22 +421,13 @@ def exchange(agent1, agent2, exchange_args):
             pass
         else:
             s_1e, m_1e, y_1e, r_1e = agent_1(
-                Variable(data['im_feats_1'], volatile=not train),
-                Variable(m_2e_binary.data, volatile=not train),
+                data['im_feats_1']
+                m_2e_binary.
                 i_exchange,
-                Variable(desc.data, volatile=not train),
+                desc,
                 use_message,
                 batch_size,
                 train)
-
-        # TODO - check Not used
-        # # Obtain predictions agent 1
-        # dist_1 = F.log_softmax(y_1e, dim=1)
-        # maxdist_1, argmax_1 = dist.data.max(1)
-        #
-        # # Obtain predictions agent 2
-        # dist_2 = F.log_softmax(y_2e, dim=1)
-        # maxdist_2, argmax_2 = dist.data.max(1)
 
         s_binary_1, s_prob_1 = s_1e
         s_binary_2, s_prob_2 = s_2e
@@ -515,7 +506,7 @@ def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
         torch.log(1 - binary_probs + 1e-8)
     log_p_z = log_p_z.sum(1)
     weight = Variable(rewards.data) - Variable(baseline_rewards.clone().detach().data)
-    if logs.size(0) > 1:  # TODO - check if this is needed
+    if logs.size(0) > 1:  # Ensures weights are not larger than 1
         weight = weight / np.maximum(1., torch.std(weight.data))
     loss = torch.mean(-1 * weight * log_p_z)
 
@@ -706,11 +697,11 @@ def run():
     # Initialize Agents
     agent1 = Agent(feature_type=FLAGS.img_feat,
                    feat_dim=FLAGS.img_feat_dim,
-                   h_dim=FLAGS.img_h_dim,
-                   m_dim=FLAGS.m_dim,  # TODO update flag
-                   desc_dim=FLAGS.desc_dim,  # TODO update flag
-                   num_classes=FLAGS.num_classes,  # TODO update flag
-                   s_dim=1  # TODO check
+                   h_dim=FLAGS.h_dim,
+                   m_dim=FLAGS.m_dim,
+                   desc_dim=FLAGS.desc_dim,
+                   num_classes=FLAGS.num_classes,
+                   s_dim=FLAGS.s_dim
                    use_binary=FLAGS.use_binary,
                    use_attn=FLAGS.visual_attn,
                    attn_dim=FLAGS.attn_dim)
@@ -722,11 +713,11 @@ def run():
 
     agent2 = Agent(feature_type=FLAGS.img_feat,
                    feat_dim=FLAGS.img_feat_dim,
-                   h_dim=FLAGS.img_h_dim,
-                   m_dim=FLAGS.m_dim,  # TODO update flag
-                   desc_dim=FLAGS.desc_dim,  # TODO update flag
-                   num_classes=FLAGS.num_classes,  # TODO update flag
-                   s_dim=1  # TODO check
+                   h_dim=FLAGS.h_dim,
+                   m_dim=FLAGS.m_dim,
+                   desc_dim=FLAGS.desc_dim,
+                   num_classes=FLAGS.num_classes,
+                   s_dim=FLAGS.s_dim
                    use_binary=FLAGS.use_binary,
                    use_attn=FLAGS.visual_attn,
                    attn_dim=FLAGS.attn_dim)
@@ -737,7 +728,6 @@ def run():
     flogger.Log("Total Parameters: {}".format(total_params))
 
     # Optimizer
-    # TODO potentially separate out baseline optimizers by selecting subset of params
     if FLAGS.optim_type == "SGD":
         optimizer_agent1 = optim.SGD(
             agent1.parameters(), lr=FLAGS.learning_rate)
@@ -943,8 +933,8 @@ def run():
             batch_accuracy['total_acc_atl1_com'].append(atleast1_accuracy_com)
 
             # Cross entropy loss for each agent
-            nll_loss_1 = nll_loss_1_nc + nll_loss_1_com
-            nll_loss_2 = nll_loss_2_nc + nll_loss_2_com
+            nll_loss_1 = FLAGS.nll_loss_weight_nc * nll_loss_1_nc + FLAGS.nll_loss_weight_com * nll_loss_1_com
+            nll_loss_2 = FLAGS.nll_loss_weight_nc * nll_loss_2_nc + FLAGS.nll_loss_weight_com * nll_loss_2_com
             loss_agent1 = nll_loss_1
             loss_agent2 = nll_loss_2
 
@@ -971,8 +961,8 @@ def run():
                     sys.exit()
 
             if FLAGS.use_binary:
-                loss_agent1 += loss_binary_1
-                loss_agent2 += loss_binary_2
+                loss_agent1 += FLAGS.rl_loss_weight * loss_binary_1
+                loss_agent2 += FLAGS.rl_loss_weight * loss_binary_2
                 if not FLAGS.fixed_exchange:
                     # TODO
                     pass
@@ -980,9 +970,8 @@ def run():
                 loss_baseline_1 = Variable(torch.zeros(1))
                 loss_baseline_2 = Variable(torch.zeros(1))
 
-            # TODO - maybe separate out baseline training
-            loss_agent1 += loss_baseline_1
-            loss_agent2 += loss_baseline_2
+            loss_agent1 += FLAGS.baseline_loss_weight * loss_baseline_1
+            loss_agent2 += FLAGS.baseline_loss_weight * loss_baseline_2
 
             # Update agent1
             optimizer_agent1.zero_grad()
@@ -1238,22 +1227,23 @@ def flags():
     gflags.DEFINE_string("branch", None, "")
     gflags.DEFINE_string("sha", None, "")
     gflags.DEFINE_boolean("debug", False, "")
+    gflags.DEFINE_string("debug_log_level", 'INFO', "")
 
     # Convenience settings
-    gflags.DEFINE_integer("save_after", 1000, "")
-    gflags.DEFINE_integer("save_interval", 100, "")
-    gflags.DEFINE_string("checkpoint", None, "")
-    gflags.DEFINE_string("conf_mat", None, "")
-    gflags.DEFINE_string("log_path", "./logs", "")
+    gflags.DEFINE_integer("save_after", 1000, "Min step (num batches) after which to save")
+    gflags.DEFINE_integer("save_interval", 100, "How often to save after min batches have been reached")
+    gflags.DEFINE_string("checkpoint", None, "Path to save data")
+    gflags.DEFINE_string("conf_mat", None, "Path to save confusion matrix")
+    gflags.DEFINE_string("log_path", "./logs", "Path to save logs")
     gflags.DEFINE_string("log_file", None, "")
-    gflags.DEFINE_string("eval_csv_file", None, "")
-    gflags.DEFINE_string("json_file", None, "")
+    gflags.DEFINE_string("eval_csv_file", None, "Path to eval log file")
+    gflags.DEFINE_string("json_file", None, "Where to store all flags for an experiment")
     gflags.DEFINE_string("log_load", None, "")
     gflags.DEFINE_boolean("eval_only", False, "")
 
     # Extract Settings
-    gflags.DEFINE_boolean("binary_only", False, "")
-    gflags.DEFINE_string("binary_output", None, "")
+    gflags.DEFINE_boolean("binary_only", False, "Only extract binary data (no training)")
+    gflags.DEFINE_string("binary_output", None, "Where to store binary data")
 
     # Performance settings
     gflags.DEFINE_boolean("cuda", False, "")
@@ -1267,14 +1257,14 @@ def flags():
     gflags.DEFINE_integer("log_dev", 1000, "")
 
     # Data settings
-    gflags.DEFINE_enum("wv_type", "glove.6B", ["fake", "glove.6B", "none"], "")
-    gflags.DEFINE_integer("wv_dim", 100, "")
-    gflags.DEFINE_string("dataset_path", "./Shapeworld/data/oneshape_simple_textselect", "")
+    # gflags.DEFINE_enum("wv_type", "glove.6B", ["fake", "glove.6B", "none"], "")
+    gflags.DEFINE_integer("wv_dim", 100, "")  # Dimension of the word vectors
+    gflags.DEFINE_string("dataset_path", "./Shapeworld/data/oneshape_simple_textselect", "Root directory of the dataset")
     gflags.DEFINE_string("dataset_mode", "train", "")
-    gflags.DEFINE_string("dataset_eval_mode", "valid", "")
-    gflags.DEFINE_string("dataset_type", "agreement", "")
-    gflags.DEFINE_string("dataset_name", "oneshape_simple_textselect", "")
-    gflags.DEFINE_integer("dataset_size", 100, "")
+    gflags.DEFINE_enum("dataset_eval_mode", "validation", ["validation", "test"])
+    gflags.DEFINE_string("dataset_type", "agreement", "Task type")
+    gflags.DEFINE_string("dataset_name", "oneshape_simple_textselect", "Name of dataset (should correspond to the root directory name automatically generated using ShapeWorld generate.py)")
+    gflags.DEFINE_integer("dataset_size", 100, "How many examples to use")
     gflags.DEFINE_string(
         "glove_path", "./glove.6B/glove.6B.100d.txt", "")
     gflags.DEFINE_boolean("shuffle_train", True, "")
@@ -1287,37 +1277,33 @@ def flags():
                        "layer4_2", "avgpool_512", "fc"], "Specify which layer output to use as image")
     gflags.DEFINE_enum("data_context", "fc", [
                        "fc"], "Specify which layer output to use as context for attention")
-    gflags.DEFINE_enum("sender_mix", "sum", ["sum", "prod", "mou"], "")
-    gflags.DEFINE_integer("img_feat_dim", 4096, "")
-    gflags.DEFINE_integer("img_h_dim", 100, "")
-    gflags.DEFINE_integer("baseline_hid_dim", 500, "")
-    gflags.DEFINE_integer("sender_out_dim", 50, "")
-    gflags.DEFINE_integer("rec_hidden", 128, "")
-    gflags.DEFINE_integer("rec_out_dim", 1, "")
-    gflags.DEFINE_integer("rec_w_dim", 50, "")
-    gflags.DEFINE_integer("rec_s_dim", 1, "")
+    # gflags.DEFINE_enum("sender_mix", "sum", ["sum", "prod", "mou"], "")
+    gflags.DEFINE_integer("img_feat_dim", 512, "Dimension of the image features")
+    gflags.DEFINE_integer("h_dim", 100, "Hidden dimension for all hidden representations in the network")
+    gflags.DEFINE_integer("m_dim", 64, "Dimension of the messages")
+    gflags.DEFINE_integer("desc_dim", 100, "Dimension of the input description vectors")
+    gflags.DEFINE_integer("num_classes", 10, "How many texts the agents have to choose from")
+    gflags.DEFINE_integer("s_dim", 1, "Stop probability output dim")
     gflags.DEFINE_boolean("use_binary", True,
                           "Encoding whether Sender uses binary features")
-    gflags.DEFINE_boolean("ignore_receiver", False,
-                          "Sender ignores messages from Receiver")
-    gflags.DEFINE_boolean("ignore_code", False,
-                          "Sender ignores messages from Receiver")
-    gflags.DEFINE_boolean(
-        "block_y", True, "Halt gradient flow through description scores")
-    gflags.DEFINE_float("first_rec", 0, "")
-    gflags.DEFINE_float("flipout_rec", None, "Dropout for bit flipping")
-    gflags.DEFINE_float("flipout_sen", None, "Dropout for bit flipping")
-    gflags.DEFINE_boolean("flipout_dev", False, "Dropout for bit flipping")
-    gflags.DEFINE_boolean("s_prob_prod", True,
-                          "Simulate sampling during test time")
+    gflags.DEFINE_boolean("ignore_2", False,
+                          "Agent 1 ignores messages from Agent 2")
+    gflags.DEFINE_boolean("ignore_1", False,
+                          "Agent 2 ignores messages from Agent 1")
+    # gflags.DEFINE_boolean("block_y", True, "Halt gradient flow through description scores")
+    gflags.DEFINE_float("first_msg", 0, "Value to fill the first message with")
+    # gflags.DEFINE_float("flipout_1", None, "Dropout for bit flipping")
+    # gflags.DEFINE_float("flipout_2", None, "Dropout for bit flipping")
+    # gflags.DEFINE_boolean("flipout_dev", False, "Dropout for bit flipping")
+    # gflags.DEFINE_boolean("s_prob_prod", True, "Simulate sampling during test time")
     gflags.DEFINE_boolean("visual_attn", False, "Sender attends over image")
     gflags.DEFINE_integer("attn_dim", 256, "")
     gflags.DEFINE_boolean("attn_extra_context", False, "")
     gflags.DEFINE_integer("attn_context_dim", 4096, "")
     gflags.DEFINE_boolean("desc_attn", False, "Receiver attends over text")
     gflags.DEFINE_integer("desc_attn_dim", 64, "Receiver attends over text")
-    gflags.DEFINE_integer("top_k_dev", 6, "Top-k error in development")
-    gflags.DEFINE_integer("top_k_train", 6, "Top-k error in training")
+    gflags.DEFINE_integer("top_k_dev", 3, "Top-k error in development")
+    gflags.DEFINE_integer("top_k_train", 3, "Top-k error in training")
 
     # Optimization settings
     gflags.DEFINE_enum("optim_type", "RMSprop", ["Adam", "SGD", "RMSprop"], "")
@@ -1328,10 +1314,14 @@ def flags():
     gflags.DEFINE_float("entropy_s", None, "")
     gflags.DEFINE_float("entropy_agent1", None, "")
     gflags.DEFINE_float("entropy_agent2", None, "")
+    gflags.DEFINE_float("nll_loss_weight_nc", 1.0, "")
+    gflags.DEFINE_float("nll_loss_weight_com", 1.0, "")
+    gflags.DEFINE_float("rl_loss_weight", 1.0, "")
+    gflags.DEFINE_float("baseline_loss_weight", 1.0, "")
 
     # Conversation settings
-    gflags.DEFINE_integer("exchange_samples", 3, "")
-    gflags.DEFINE_integer("max_exchange", 3, "")
+    gflags.DEFINE_integer("exchange_samples", 1, "")
+    gflags.DEFINE_integer("max_exchange", 1, "")
     gflags.DEFINE_boolean("fixed_exchange", True, "")
     gflags.DEFINE_boolean(
         "bit_flip", False, "Whether sender's messages are corrupted.")
@@ -1416,5 +1406,10 @@ if __name__ == '__main__':
     default_flags()
 
     print(sys.argv)
+
+    FORMAT = '[%(asctime)s %(levelname)s] %(message)s'
+    logging.basicConfig(format=FORMAT)
+    debuglogger = logging.getLogger('main_logger')
+    debuglogger.setLevel(FLAGS.debug_log_level)
 
     run()

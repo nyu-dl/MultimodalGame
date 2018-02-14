@@ -174,15 +174,19 @@ def eval_dev(top_k, agent1, agent2, callback=None):
         pred_labels_2_com.append(argmax_2.cpu().numpy())
 
         # Calculate number of correct observations for different types
-        accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
-        accuracy_1, correct_1 = calculate_accuracy(dist_1, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
-        accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
-        accuracy_2, correct_2 = calculate_accuracy(dist_2, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_1_nc, correct_1_nc, top_1_1_nc = calculate_accuracy(dist_1_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_1, correct_1, top_1_1 = calculate_accuracy(dist_1, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_2_nc, correct_2_nc, top_1_2_nc = calculate_accuracy(dist_2_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_2, correct_2, top_1_2 = calculate_accuracy(dist_2, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
         batch_correct_nc = correct_1_nc.float() + correct_2_nc.float()
         batch_correct_com = correct_1.float() + correct_2.float()
+        batch_correct_top_1_nc = top_1_1_nc.float() + top_1_2_nc.float()
+        batch_correct_top_1_com = top_1_1.float() + top_1_2.float()
 
         debuglogger.debug(f'eval batch correct com: {batch_correct_com}')
         debuglogger.debug(f'eval batch correct nc: {batch_correct_nc}')
+        debuglogger.debug(f'eval batch top 1 correct com: {batch_correct_top_1_com}')
+        debuglogger.debug(f'eval batch top 1 correct nc: {batch_correct_top_1_nc}')
 
         # Update accuracy counts
         total += float(_batch_size)
@@ -615,8 +619,10 @@ def calculate_accuracy(prediction_dist, target, batch_size, top_k):
     target_exp = target.view(-1, 1).expand(batch_size, top_k)
     top_k_ind = torch.from_numpy(prediction_dist.data.cpu().numpy().argsort()[:, -top_k:]).long()
     correct = (top_k_ind == target_exp.cpu()).sum(dim=1)
+    top_1_ind = torch.from_numpy(prediction_dist.data.cpu().numpy().argsort()[:, -1:]).long()
+    top_1 = (top_1_ind == target.view(-1, 1).cpu()).sum(dim=1)
     accuracy = correct.sum() / float(batch_size)
-    return accuracy, correct
+    return accuracy, correct, top_1
 
 
 def log_exchange(s, message_1, message_2, log_type="Train:"):
@@ -925,10 +931,10 @@ def run():
                 ent_agent2_y = []
 
             # Calculate accuracy
-            accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
-            accuracy_1, correct_1 = calculate_accuracy(dist_1, target, FLAGS.batch_size, FLAGS.top_k_train)
-            accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
-            accuracy_2, correct_2 = calculate_accuracy(dist_2, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_1_nc, correct_1_nc, top_1_1_nc = calculate_accuracy(dist_1_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_1, correct_1, top_1_1 = calculate_accuracy(dist_1, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_2_nc, correct_2_nc, top_1_2_nc = calculate_accuracy(dist_2_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_2, correct_2, top_1_2 = calculate_accuracy(dist_2, target, FLAGS.batch_size, FLAGS.top_k_train)
 
             # Calculate rewards
             total_correct_nc = correct_1_nc.float() + correct_2_nc.float()
@@ -938,7 +944,12 @@ def run():
             atleast1_accuracy_nc = (total_correct_nc > 0).sum() / float(FLAGS.batch_size)
             atleast1_accuracy_com = (total_correct_com > 0).sum() / float(FLAGS.batch_size)
             # rewards = difference between performance before and after communication
-            rewards = (total_correct_com.float() - total_correct_nc.float())
+            # Only use top 1
+            total_correct_top_1_nc = top_1_1_nc.float() + top_1_2_nc.float()
+            total_correct_top_1_com = top_1_1.float() + top_1_2.float()
+            rewards = (total_correct_top_1_com.float() - total_correct_top_1_nc.float())
+            debuglogger.debug(f'total correct top 1 com: {total_correct_top_1_com}')
+            debuglogger.debug(f'total correct top 1 nc: {total_correct_top_1_nc}')
             debuglogger.debug(f'total correct com: {total_correct_com}')
             debuglogger.debug(f'total correct nc: {total_correct_nc}')
             debuglogger.debug(f'rewards: {rewards}')

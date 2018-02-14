@@ -1,0 +1,200 @@
+Attribute-color-yellow 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-magenta 1 EntityType
+Attribute-color-yellow 1 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-cyan Attribute-shape-ellipse 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-cross 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-color-yellow Attribute-shape-rectangle 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-ellipse 1 EntityType
+Attribute-color-magenta Attribute-shape-cross 2 EntityType
+Attribute-shape-rectangle 1 EntityType
+Attribute-color-cyan 1 EntityType
+Attribute-color-cyan 1 EntityType

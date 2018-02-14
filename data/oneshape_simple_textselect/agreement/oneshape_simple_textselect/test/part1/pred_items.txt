@@ -1,0 +1,200 @@
+yellow
+cyan || ellipse
+cross
+cross || magenta
+magenta
+cyan || ellipse
+yellow || rectangle
+cyan
+yellow || rectangle
+cyan || ellipse
+cyan
+yellow || rectangle
+ellipse
+cross || magenta
+ellipse
+cross || magenta
+rectangle
+cross || magenta
+cross || magenta
+cyan || ellipse
+cyan || ellipse
+yellow || rectangle
+magenta
+ellipse
+rectangle
+ellipse
+cyan || ellipse
+yellow
+yellow || rectangle
+cross || magenta
+cross
+cyan || ellipse
+cross
+yellow || rectangle
+rectangle
+yellow || rectangle
+magenta
+yellow || rectangle
+yellow
+yellow || rectangle
+cross
+cyan || ellipse
+rectangle
+cyan || ellipse
+magenta
+cross || magenta
+cross || magenta
+rectangle
+cyan
+yellow || rectangle
+cross
+ellipse
+cross || magenta
+cross || magenta
+yellow || rectangle
+magenta
+magenta
+yellow || rectangle
+yellow || rectangle
+cyan
+yellow || rectangle
+cross || magenta
+magenta
+yellow || rectangle
+cyan || ellipse
+ellipse
+cyan || ellipse
+cross || magenta
+cyan || ellipse
+cyan
+cyan || ellipse
+magenta
+cyan || ellipse
+ellipse
+cross || magenta
+cyan || ellipse
+cross || magenta
+ellipse
+yellow || rectangle
+rectangle
+yellow || rectangle
+cross
+yellow || rectangle
+cross || magenta
+ellipse
+ellipse
+cyan || ellipse
+yellow
+magenta
+cross
+cyan || ellipse
+cyan || ellipse
+cyan || ellipse
+cross || magenta
+cross
+ellipse
+cyan || ellipse
+yellow || rectangle
+ellipse
+cross || magenta
+yellow
+magenta
+cyan || ellipse
+yellow
+rectangle
+cyan || ellipse
+cross
+cross || magenta
+yellow || rectangle
+cyan || ellipse
+cyan || ellipse
+cross || magenta
+ellipse
+cyan
+yellow
+cyan
+cross || magenta
+yellow
+yellow || rectangle
+yellow || rectangle
+cyan
+cross || magenta
+cross || magenta
+cyan || ellipse
+cross || magenta
+cross || magenta
+cyan || ellipse
+cyan || ellipse
+rectangle
+yellow || rectangle
+magenta
+cyan || ellipse
+cross
+cyan || ellipse
+ellipse
+magenta
+rectangle
+cyan || ellipse
+yellow || rectangle
+yellow || rectangle
+cyan
+cyan || ellipse
+cyan || ellipse
+cyan || ellipse
+cyan || ellipse
+cyan || ellipse
+cyan || ellipse
+cyan || ellipse
+cross
+yellow
+cyan || ellipse
+cyan || ellipse
+yellow || rectangle
+cyan
+yellow
+magenta
+yellow
+ellipse
+cyan || ellipse
+yellow || rectangle
+rectangle
+cyan || ellipse
+yellow
+magenta
+yellow || rectangle
+yellow || rectangle
+yellow || rectangle
+yellow || rectangle
+magenta
+cross
+ellipse
+yellow || rectangle
+ellipse
+cross
+ellipse
+magenta
+yellow
+cyan || ellipse
+yellow || rectangle
+rectangle
+cross
+yellow || rectangle
+cross || magenta
+cyan || ellipse
+cross || magenta
+cross
+yellow || rectangle
+cross
+cross || magenta
+cross || magenta
+yellow || rectangle
+ellipse
+ellipse
+rectangle
+cross || magenta
+ellipse
+cross || magenta
+rectangle
+cyan
+cyan

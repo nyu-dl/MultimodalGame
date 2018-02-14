@@ -1,0 +1,200 @@
+circle || blue
+circle || blue
+circle
+square || red
+square || red
+square
+red
+green
+triangle || green
+circle || blue
+triangle
+circle || blue
+circle || blue
+square || red
+circle || blue
+triangle
+square
+circle || blue
+circle || blue
+square || red
+triangle
+green
+green
+blue
+square
+triangle || green
+triangle || green
+red
+circle || blue
+circle || blue
+blue
+triangle || green
+circle || blue
+triangle
+square || red
+green
+square || red
+red
+green
+circle || blue
+triangle || green
+square || red
+triangle || green
+square
+triangle || green
+square
+triangle || green
+red
+blue
+triangle || green
+circle || blue
+circle
+blue
+triangle || green
+square || red
+triangle || green
+circle
+circle || blue
+triangle || green
+square
+circle
+red
+triangle
+circle || blue
+red
+square || red
+triangle || green
+green
+square || red
+triangle || green
+circle || blue
+circle || blue
+circle
+red
+green
+square || red
+circle || blue
+circle
+circle || blue
+square || red
+square || red
+square || red
+green
+circle
+triangle || green
+circle || blue
+green
+square || red
+triangle || green
+circle || blue
+square || red
+square || red
+triangle || green
+triangle || green
+red
+triangle || green
+triangle
+circle || blue
+blue
+circle || blue
+green
+red
+circle || blue
+red
+red
+triangle
+circle
+circle || blue
+circle || blue
+green
+triangle
+green
+circle || blue
+circle || blue
+circle || blue
+circle
+square
+square
+triangle
+circle || blue
+circle || blue
+red
+triangle
+circle
+circle || blue
+triangle || green
+circle || blue
+triangle || green
+circle || blue
+green
+triangle || green
+green
+green
+circle
+triangle
+blue
+green
+square || red
+square || red
+circle
+triangle || green
+blue
+triangle
+square
+triangle || green
+green
+triangle
+triangle || green
+circle || blue
+triangle || green
+square || red
+square
+red
+circle || blue
+triangle || green
+square || red
+triangle
+green
+green
+circle
+circle || blue
+circle
+red
+green
+square
+blue
+blue
+square || red
+circle || blue
+triangle || green
+circle
+blue
+square
+square
+green
+circle || blue
+triangle || green
+square
+square || red
+square || red
+circle || blue
+triangle || green
+triangle
+triangle || green
+circle || blue
+square || red
+circle || blue
+triangle || green
+triangle
+square
+green
+triangle || green
+blue
+blue
+circle || blue
+circle || blue
+red
+triangle || green
+triangle
+triangle || green

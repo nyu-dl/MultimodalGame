@@ -1,0 +1,200 @@
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-red 1 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-green 1 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-red 1 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green 1 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-red 1 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-green 1 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-circle 1 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-red Attribute-shape-square 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-shape-square 1 EntityType
+Attribute-color-green 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-color-blue 1 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-blue Attribute-shape-circle 2 EntityType
+Attribute-color-red 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType
+Attribute-shape-triangle 1 EntityType
+Attribute-color-green Attribute-shape-triangle 2 EntityType

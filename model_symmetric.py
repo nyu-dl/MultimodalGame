@@ -28,9 +28,9 @@ from misc import read_log_load
 from misc import xavier_normal
 from misc import build_mask
 
+from agents import Agent
 from dataset_loader import load_shapeworld_dataset
 from binary_vectors import extract_binary
-
 from sparks import sparks
 
 import gflags
@@ -107,7 +107,7 @@ def eval_dev(top_k, agent1, agent2, callback=None):
         im_feats_1 = batch["im_feats_1"]
         im_feats_2 = batch["im_feats_2"]
         p = batch["p"]
-        desc = batch["texts_vec"]
+        desc = Variable(batch["texts_vec"])
         _batch_size = target.size(0)
 
         true_labels.append(target.cpu().numpy().reshape(-1))
@@ -174,10 +174,10 @@ def eval_dev(top_k, agent1, agent2, callback=None):
         pred_labels_2_com.append(argmax_2.cpu().numpy())
 
         # Calculate number of correct observations for different types
-        accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc)
-        accuracy_1, correct_1 = calculate_accuracy(dist_1)
-        accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc)
-        accuracy_2, correct_2 = calculate_accuracy(dist_2)
+        accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc, target)
+        accuracy_1, correct_1 = calculate_accuracy(dist_1, target)
+        accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc, target)
+        accuracy_2, correct_2 = calculate_accuracy(dist_2, target)
         total_correct_nc = correct_1_nc + correct_2_nc
         total_correct_com = correct_1 + correct_2
 
@@ -226,6 +226,7 @@ def eval_dev(top_k, agent1, agent2, callback=None):
                 y_nc=y_nc,
                 y=y)
             callback(agent1, agent2, batch, callback_dict)
+        break
 
     # Print confusion matrix
     true_labels = np.concatenate(true_labels).reshape(-1)
@@ -309,6 +310,8 @@ def exchange(agent1, agent2, exchange_args):
     """
 
     data = exchange_args["data"]
+    # TODO extend implementation to include data context
+    data_context = None
     target = exchange_args["target"]
     desc = exchange_args["desc"]
     train = exchange_args["train"]
@@ -322,9 +325,9 @@ def exchange(agent1, agent2, exchange_args):
     stop_mask_1 = [Variable(torch.ones(batch_size, 1).byte())]
     stop_feat_1 = []
     stop_prob_1 = []
-    stop_mask_1 = [Variable(torch.ones(batch_size, 1).byte())]
-    stop_feat_1 = []
-    stop_prob_1 = []
+    stop_mask_2 = [Variable(torch.ones(batch_size, 1).byte())]
+    stop_feat_2 = []
+    stop_prob_2 = []
     feats_1 = []
     probs_1 = []
     feats_2 = []
@@ -337,19 +340,19 @@ def exchange(agent1, agent2, exchange_args):
     r_2 = []
 
     # First message (default is 0)
-    m_binary = Variable(torch.FloatTensor(batch_size, agent_1.m_dim).fill_(FLAGS.first_msg), volatile=not train)
+    m_binary = Variable(torch.FloatTensor(batch_size, agent1.m_dim).fill_(FLAGS.first_msg), volatile=not train)
     if FLAGS.cuda:
         m_binary = m_binary.cuda()
 
     if train:
-        agent_1.train()
-        agent_2.train()
+        agent1.train()
+        agent2.train()
     else:
-        agent_1.eval()
-        agent_2.eval()
+        agent1.eval()
+        agent2.eval()
 
-    agent_1.reset_state()
-    agent_2.reset_state()
+    agent1.reset_state()
+    agent2.reset_state()
 
     # The message is ignored initially
     use_message = False
@@ -359,7 +362,7 @@ def exchange(agent1, agent2, exchange_args):
         debuglogger.warning(f'Data context not supported currently')
         sys.exit()
     else:
-        s_1e, m_1e, y_1e, r_1e = agent_1(
+        s_1e, m_1e, y_1e, r_1e = agent1(
             data['im_feats_1'],
             m_binary,
             0,
@@ -368,7 +371,7 @@ def exchange(agent1, agent2, exchange_args):
             batch_size,
             train)
 
-        s_2e, m_2e, y_2e, r_2e = agent_2(
+        s_2e, m_2e, y_2e, r_2e = agent2(
             data['im_feats_2'],
             m_binary,
             0,
@@ -400,7 +403,7 @@ def exchange(agent1, agent2, exchange_args):
             debuglogger.warning(f'Data context not supported currently')
             sys.exit()
         else:
-            s_2e, m_2e, y_2e, r_2e = agent_2(
+            s_2e, m_2e, y_2e, r_2e = agent2(
                 data['im_feats_2'],
                 m_1e_binary,
                 i_exchange,
@@ -420,9 +423,9 @@ def exchange(agent1, agent2, exchange_args):
         if data_context is not None:
             pass
         else:
-            s_1e, m_1e, y_1e, r_1e = agent_1(
-                data['im_feats_1']
-                m_2e_binary.
+            s_1e, m_1e, y_1e, r_1e = agent1(
+                data['im_feats_1'],
+                m_2e_binary,
                 i_exchange,
                 desc,
                 use_message,
@@ -436,8 +439,8 @@ def exchange(agent1, agent2, exchange_args):
 
         # Save for later
         # TODO check stop mask
-        stop_mask_1.append(torch.min(stop_mask[-1], s_binary_1.byte()))
-        stop_mask_2.append(torch.min(stop_mask[-1], s_binary_2.byte()))
+        stop_mask_1.append(torch.min(stop_mask_1[-1], s_binary_1.byte()))
+        stop_mask_2.append(torch.min(stop_mask_2[-1], s_binary_2.byte()))
         stop_feat_1.append(s_binary_1)
         stop_feat_2.append(s_binary_2)
         stop_prob_1.append(s_prob_1)
@@ -505,8 +508,8 @@ def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
         (1 - Variable(binary_features.data)) * \
         torch.log(1 - binary_probs + 1e-8)
     log_p_z = log_p_z.sum(1)
-    weight = Variable(rewards.data) - Variable(baseline_rewards.clone().detach().data)
-    if logs.size(0) > 1:  # Ensures weights are not larger than 1
+    weight = Variable(rewards) - Variable(baseline_rewards.clone().detach().data)
+    if rewards.size(0) > 1:  # Ensures weights are not larger than 1
         weight = weight / np.maximum(1., torch.std(weight.data))
     loss = torch.mean(-1 * weight * log_p_z)
 
@@ -563,7 +566,7 @@ def multistep_loss_binary(binary_features, binary_probs, logs, baseline_scores, 
 
 
 def calculate_loss_bas(baseline_scores, rewards):
-    loss_bas = nn.MSELoss()(baseline_scores, Variable(rewards.data))
+    loss_bas = nn.MSELoss()(baseline_scores, Variable(rewards))
     return loss_bas
 
 
@@ -593,11 +596,12 @@ def bin_to_alpha(binary):
     return " ".join(ret)
 
 
-def calculate_accuracy(prediction_dist, target):
-    assert FLAGS.batch_size == target.size(0)
+def calculate_accuracy(prediction_dist, target, mode='train'):
+    # TODO FIX
+    assert (FLAGS.batch_size == target.size(0)) or (FLAGS.batch_size_dev == target.size(0))
     target_exp = target.view(-1, 1).expand(FLAGS.batch_size, FLAGS.top_k_train)
     top_k_ind = torch.from_numpy(prediction_dist.data.cpu().numpy().argsort()[:, -FLAGS.top_k_train:]).long()
-    correct = (top_k_ind == target_exp.cpu()).sum(axis=1)
+    correct = (top_k_ind == target_exp.cpu()).sum(dim=1)
     accuracy = correct.sum() / float(FLAGS.batch_size)
     return accuracy, correct
 
@@ -675,7 +679,7 @@ def get_classification_loss_and_stats(predictions, targets):
     maxdist, argmax = dist.data.max(1)
     probs = F.softmax(predictions, dim=1)
     ent = (torch.log(probs + 1e-8) * probs).sum(1).mean()
-    debuglogger.debug(f'Mean entropy: {ent.size()}')
+    debuglogger.debug(f'Mean entropy: {ent.data[0]}')
     nll_loss = nn.NLLLoss()(dist, Variable(targets))
     logs = loglikelihood(Variable(dist.data),
                          Variable(targets.view(-1, 1)))
@@ -695,32 +699,34 @@ def run():
             f.write(json.dumps(FLAGS.FlagValuesDict(), indent=4, sort_keys=True))
 
     # Initialize Agents
-    agent1 = Agent(feature_type=FLAGS.img_feat,
-                   feat_dim=FLAGS.img_feat_dim,
+    agent1 = Agent(im_feature_type=FLAGS.img_feat,
+                   im_feat_dim=FLAGS.img_feat_dim,
                    h_dim=FLAGS.h_dim,
                    m_dim=FLAGS.m_dim,
                    desc_dim=FLAGS.desc_dim,
                    num_classes=FLAGS.num_classes,
-                   s_dim=FLAGS.s_dim
+                   s_dim=FLAGS.s_dim,
                    use_binary=FLAGS.use_binary,
                    use_attn=FLAGS.visual_attn,
-                   attn_dim=FLAGS.attn_dim)
+                   attn_dim=FLAGS.attn_dim,
+                   use_MLP=FLAGS.use_MLP)
 
     flogger.Log("Agent 1 Architecture: {}".format(agent1))
     total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
                         for p in agent1.parameters()])
     flogger.Log("Total Parameters: {}".format(total_params))
 
-    agent2 = Agent(feature_type=FLAGS.img_feat,
-                   feat_dim=FLAGS.img_feat_dim,
+    agent2 = Agent(im_feature_type=FLAGS.img_feat,
+                   im_feat_dim=FLAGS.img_feat_dim,
                    h_dim=FLAGS.h_dim,
                    m_dim=FLAGS.m_dim,
                    desc_dim=FLAGS.desc_dim,
                    num_classes=FLAGS.num_classes,
-                   s_dim=FLAGS.s_dim
+                   s_dim=FLAGS.s_dim,
                    use_binary=FLAGS.use_binary,
                    use_attn=FLAGS.visual_attn,
-                   attn_dim=FLAGS.attn_dim)
+                   attn_dim=FLAGS.attn_dim,
+                   use_MLP=FLAGS.use_MLP)
 
     flogger.Log("Agent 2 Architecture: {}".format(agent2))
     total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
@@ -816,28 +822,30 @@ def run():
         batch_accuracy = {'total_nc': [],  # no communicaton
                           'total_com': [],  # after communication
                           'rewards': [],  # total_com - total_nc
-                          'total_acc_both_nc': []  # % both agents right before comms
-                          'total_acc_both_com': []  # % both agents right after comms
-                          'total_acc_atl1_nc': []  # % at least 1 agent right before comms
-                          'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                          'total_acc_both_nc': [],  # % both agents right before comms
+                          'total_acc_both_com': [],  # % both agents right after comms
+                          'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                          'total_acc_atl1_com': [],  # % at least 1 agent right after comms
                           'agent1_nc': [],  # no communicaton
                           'agent2_nc': [],  # no communicaton
                           'agent1_com': [],  # after communicaton
                           'agent2_com': []  # after communicaton
                           }
-        dev_accuracy = {'total_acc_both_nc': []  # % both agents right before comms
-                        'total_acc_both_com': []  # % both agents right after comms
-                        'total_acc_atl1_nc': []  # % at least 1 agent right before comms
+        dev_accuracy = {'total_acc_both_nc': [],  # % both agents right before comms
+                        'total_acc_both_com': [],  # % both agents right after comms
+                        'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
                         'total_acc_atl1_com': []  # % at least 1 agent right after comms
                         }
 
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
-            target = batch["target"]
-            im_feats_1 = batch["im_feats_1"]
-            im_feats_2 = batch["im_feats_2"]
+            debuglogger.debug(f'Generated batch {i_batch}')
+
+            target = batch["target"]  # Converted to Variable in get_classification_loss_and_stats
+            im_feats_1 = batch["im_feats_1"]  # Already Variable
+            im_feats_2 = batch["im_feats_2"]  # Already Variable
             p = batch["p"]
-            desc = batch["texts_vec"]
+            desc = Variable(batch["texts_vec"])
 
             # GPU support
             if FLAGS.cuda:
@@ -904,20 +912,23 @@ def run():
                 ent_agent2_y = []
 
             # Calculate accuracy
-            accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc)
-            accuracy_1, correct_1 = calculate_accuracy(dist_1)
-            accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc)
-            accuracy_2, correct_2 = calculate_accuracy(dist_2)
+            accuracy_1_nc, correct_1_nc = calculate_accuracy(dist_1_nc, target)
+            accuracy_1, correct_1 = calculate_accuracy(dist_1, target)
+            accuracy_2_nc, correct_2_nc = calculate_accuracy(dist_2_nc, target)
+            accuracy_2, correct_2 = calculate_accuracy(dist_2, target)
 
             # Calculate rewards
             total_correct_nc = correct_1_nc + correct_2_nc
             total_correct_com = correct_1 + correct_2
-            total_accuracy_nc = (total_correct_nc == 2).sum() / batch_size
-            total_accuracy_com = (total_correct_com == 2).sum() / batch_size
-            atleast1_accuracy_nc = (total_correct_nc > 0).sum() / batch_size
-            atleast1_accuracy_com = (total_correct_com > 0).sum() / batch_size
+            total_accuracy_nc = (total_correct_nc == 2).sum() / float(FLAGS.batch_size)
+            total_accuracy_com = (total_correct_com == 2).sum() / float(FLAGS.batch_size)
+            atleast1_accuracy_nc = (total_correct_nc > 0).sum() / float(FLAGS.batch_size)
+            atleast1_accuracy_com = (total_correct_com > 0).sum() / float(FLAGS.batch_size)
             # rewards = difference between performance before and after communication
-            rewards = both_correct_com - both_correct_nc
+            rewards = (total_correct_com.float() - total_correct_nc.float())
+            debuglogger.debug(f'total correct com: {total_correct_com}')
+            debuglogger.debug(f'total correct nc: {total_correct_nc}')
+            debuglogger.debug(f'rewards: {rewards}')
 
             # Store results
             batch_accuracy['agent1_nc'].append(accuracy_1_nc)
@@ -943,14 +954,15 @@ def run():
                 if not FLAGS.fixed_exchange:
                     # TODO - fix
                     # Stop loss
+                    # TODO - check old use of entropy_s
                     # The receiver might have no z-loss if we stop after first message from sender.
                     debuglogger.warning(f'Error: multistep fixed exchange not implemented yet')
                     sys.exit()
                 elif FLAGS.max_exchange == 1:
-                    loss_binary_1, ent_bin_1 = calculate_loss_binary(feats_1, probs_1, rewards, r[0], FLAGS.entropy_agent1)
-                    loss_binary_2, ent_bin_2 = calculate_loss_binary(feats_2, probs_2, rewards, r[1], FLAGS.entropy_agent2)
-                    loss_baseline_1 = calculate_loss_bas(r[0], rewards)
-                    loss_baseline_2 = calculate_loss_bas(r[1], rewards)
+                    loss_binary_1, ent_bin_1 = calculate_loss_binary(feats_1[0], probs_1[0], rewards, r[0][0], FLAGS.entropy_agent1)
+                    loss_binary_2, ent_bin_2 = calculate_loss_binary(feats_2[0], probs_2[0], rewards, r[1][0], FLAGS.entropy_agent2)
+                    loss_baseline_1 = calculate_loss_bas(r[0][0], rewards)
+                    loss_baseline_2 = calculate_loss_bas(r[1][0], rewards)
                     ent_agent1_bin = [ent_bin_1]
                     ent_agent2_bin = [ent_bin_2]
                 elif FLAGS.max_exchange > 1:
@@ -1208,7 +1220,7 @@ def FixedAttention():
     FLAGS.fixed_exchange = True
     FLAGS.visual_attn = True
     FLAGS.attn_dim = 256
-    FLAGS.attn_extra_context = True
+    FLAGS.attn_extra_context = False
     FLAGS.attn_context_dim = 1000
 
 
@@ -1257,11 +1269,11 @@ def flags():
     gflags.DEFINE_integer("log_dev", 1000, "")
 
     # Data settings
-    # gflags.DEFINE_enum("wv_type", "glove.6B", ["fake", "glove.6B", "none"], "")
-    gflags.DEFINE_integer("wv_dim", 100, "")  # Dimension of the word vectors
+    gflags.DEFINE_integer("wv_dim", 100, "Dimension of the word vectors")
+    gflags.DEFINE_string("dataset", "shapeworld", "What type of dataset to use")
     gflags.DEFINE_string("dataset_path", "./Shapeworld/data/oneshape_simple_textselect", "Root directory of the dataset")
     gflags.DEFINE_string("dataset_mode", "train", "")
-    gflags.DEFINE_enum("dataset_eval_mode", "validation", ["validation", "test"])
+    gflags.DEFINE_enum("dataset_eval_mode", "validation", ["validation", "test"], "")
     gflags.DEFINE_string("dataset_type", "agreement", "Task type")
     gflags.DEFINE_string("dataset_name", "oneshape_simple_textselect", "Name of dataset (should correspond to the root directory name automatically generated using ShapeWorld generate.py)")
     gflags.DEFINE_integer("dataset_size", 100, "How many examples to use")
@@ -1269,6 +1281,8 @@ def flags():
         "glove_path", "./glove.6B/glove.6B.100d.txt", "")
     gflags.DEFINE_boolean("shuffle_train", True, "")
     gflags.DEFINE_boolean("shuffle_dev", False, "")
+    gflags.DEFINE_integer("random_seed", 7, "")
+    gflags.DEFINE_enum("resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")
 
     # Model settings
     gflags.DEFINE_enum("model_type", None, [
@@ -1285,7 +1299,7 @@ def flags():
     gflags.DEFINE_integer("num_classes", 10, "How many texts the agents have to choose from")
     gflags.DEFINE_integer("s_dim", 1, "Stop probability output dim")
     gflags.DEFINE_boolean("use_binary", True,
-                          "Encoding whether Sender uses binary features")
+                          "Encoding whether agents uses binary features")
     gflags.DEFINE_boolean("ignore_2", False,
                           "Agent 1 ignores messages from Agent 2")
     gflags.DEFINE_boolean("ignore_1", False,
@@ -1296,12 +1310,13 @@ def flags():
     # gflags.DEFINE_float("flipout_2", None, "Dropout for bit flipping")
     # gflags.DEFINE_boolean("flipout_dev", False, "Dropout for bit flipping")
     # gflags.DEFINE_boolean("s_prob_prod", True, "Simulate sampling during test time")
-    gflags.DEFINE_boolean("visual_attn", False, "Sender attends over image")
+    gflags.DEFINE_boolean("visual_attn", False, "agents attends over image")
+    gflags.DEFINE_boolean("use_MLP", False, "use MLP to generate prediction scores")
     gflags.DEFINE_integer("attn_dim", 256, "")
     gflags.DEFINE_boolean("attn_extra_context", False, "")
     gflags.DEFINE_integer("attn_context_dim", 4096, "")
-    gflags.DEFINE_boolean("desc_attn", False, "Receiver attends over text")
-    gflags.DEFINE_integer("desc_attn_dim", 64, "Receiver attends over text")
+    gflags.DEFINE_boolean("desc_attn", False, "agents attend over text")
+    gflags.DEFINE_integer("desc_attn_dim", 64, "text attention dim")
     gflags.DEFINE_integer("top_k_dev", 3, "Top-k error in development")
     gflags.DEFINE_integer("top_k_train", 3, "Top-k error in training")
 
@@ -1341,17 +1356,14 @@ def default_flags():
         eval(FLAGS.model_type)()
         FLAGS(sys.argv)  # Optionally override predefined flags.
 
-    assert FLAGS.sender_out_dim == FLAGS.rec_w_dim, \
-        "Both sender and receiver should communicate with same dim vectors for now."
-
     if not FLAGS.use_binary:
         FLAGS.exchange_samples = 0
 
     if not FLAGS.experiment_name:
         timestamp = str(int(time.time()))
         FLAGS.experiment_name = "{}-so_{}-wv_{}-bs_{}-{}".format(
-            FLAGS.images,
-            FLAGS.sender_out_dim,
+            FLAGS.dataset,
+            FLAGS.m_dim,
             FLAGS.wv_dim,
             FLAGS.batch_size,
             timestamp,

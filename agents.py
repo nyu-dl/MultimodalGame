@@ -196,8 +196,9 @@ class MessageGenerator(nn.Module):
         y_broadcast = y_scores.unsqueeze(2).expand(
             batch_size, num_classes, self.hid_dim)
         debuglogger.debug(f'y_broadcast: {y_broadcast.size()}')
-        debuglogger.debug(f'y_broadcast: {y_broadcast}')
+        # debuglogger.debug(f'y_broadcast: {y_broadcast}')
         debuglogger.debug(f'desc: {desc.size()}')
+        # Weight descriptions based on current predictions
         desc = torch.mul(y_broadcast, desc).sum(1).squeeze(1)
         debuglogger.debug(f'desc: {desc.size()}')
         # desc: batch_size x hid_dim
@@ -208,8 +209,8 @@ class MessageGenerator(nn.Module):
             if training:
                 probs_ = w_probs.data.cpu().numpy()
                 rand_num = np.random.rand(*probs_.shape)
-                debuglogger.debug(f'rand_num: {rand_num}')
-                debuglogger.debug(f'probs: {probs_}')
+                # debuglogger.debug(f'rand_num: {rand_num}')
+                # debuglogger.debug(f'probs: {probs_}')
                 w_binary = _Variable(torch.from_numpy(
                     (rand_num < probs_).astype('float32')))
             else:
@@ -217,7 +218,7 @@ class MessageGenerator(nn.Module):
             if w_probs.is_cuda:
                 w_binary = w_binary.cuda()
             w_feats = w_binary
-            debuglogger.debug(f'w_binary: {w_binary}')
+            # debuglogger.debug(f'w_binary: {w_binary}')
         else:
             w_feats = w_scores
             w_probs = None
@@ -257,7 +258,8 @@ class Agent(nn.Module):
                  s_dim,
                  use_binary,
                  use_attn,
-                 attn_dim):
+                 attn_dim,
+                 use_MLP):
         super(Agent, self).__init__()
         self.im_feature_type = im_feature_type
         self.im_feat_dim = im_feat_dim
@@ -268,6 +270,7 @@ class Agent(nn.Module):
         self.s_dim = s_dim
         self.use_binary = use_binary
         self.use_attn = use_attn
+        self.use_MLP = use_MLP
         self.attn_dim = attn_dim
         self.image_processor = ImageProcessor(
             im_feat_dim, h_dim, use_attn, attn_dim)
@@ -310,26 +313,32 @@ class Agent(nn.Module):
     def initial_state(self, batch_size):
         return _Variable(torch.zeros(batch_size, self.h_dim))
 
-    def predict_classes(self, h_c, desc_proc):
+    def predict_classes(self, h_c, desc_proc, batch_size):
         '''
-        Scores each class using an MLP
-        desc_proc:    bs x num_classes x hid_dim
-        h_c:          bs x hid_dim
-        hid_cat_desc: (bs x num_classes) x (hid_dim * 2)
+        Scores each class using an MLP or simple dot product
+        desc_proc:     bs x num_classes x hid_dim
+        h_c:           bs x hid_dim
+        h_c:           bs x hid_dim x 1
+        h_c_expand:    bs x num_classes x hid_dim
+        hid_cat_desc:  (bs x num_classes) x (hid_dim * 2)
+        y:             bs x num_classes
         '''
-        # TODO add option for dot product or MLP (not just MLP)
-        h_c_expand = torch.unsqueeze(
-            h_c, dim=1).expand(-1, self.num_classes, -1)
-        debuglogger.debug(f'h_c_expand: {h_c_expand.size()}')
-        debuglogger.debug(f'h_c: {h_c}')
-        debuglogger.debug(f'h_c_expand: {h_c_expand}')
-        hid_cat_desc = torch.cat([h_c_expand, desc_proc], dim=2)
-        debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
-        hid_cat_desc = hid_cat_desc.view(-1, self.h_dim * 2)
-        debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
-        y = F.relu(self.y1(hid_cat_desc))
-        debuglogger.debug(f'y: {y.size()}')
-        y = self.y2(y).view(batch_size, -1)
+        if self.use_MLP:
+            h_c_expand = torch.unsqueeze(
+                h_c, dim=1).expand(-1, self.num_classes, -1)
+            debuglogger.debug(f'h_c_expand: {h_c_expand.size()}')
+            # debuglogger.debug(f'h_c: {h_c}')
+            # debuglogger.debug(f'h_c_expand: {h_c_expand}')
+            hid_cat_desc = torch.cat([h_c_expand, desc_proc], dim=2)
+            debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
+            hid_cat_desc = hid_cat_desc.view(-1, self.h_dim * 2)
+            debuglogger.debug(f'hid_cat_desc: {hid_cat_desc.size()}')
+            y = F.relu(self.y1(hid_cat_desc))
+            debuglogger.debug(f'y: {y.size()}')
+            y = self.y2(y).view(batch_size, -1)
+        else:
+            h_c_unsqueezed = h_c.unsqueeze(dim=2)
+            y = torch.bmm(desc_proc, h_c_unsqueezed).squeeze(dim=2)
         debuglogger.debug(f'y: {y.size()}')
         return y
 
@@ -419,22 +428,22 @@ class Agent(nn.Module):
             # Sample decisions
             prob_ = s_prob.data.cpu().numpy()
             rand_num = np.random.rand(*prob_.shape)
-            debuglogger.debug(f'rand_num: {rand_num}')
-            debuglogger.debug(f'prob: {prob_}')
+            # debuglogger.debug(f'rand_num: {rand_num}')
+            # debuglogger.debug(f'prob: {prob_}')
             s_binary = _Variable(torch.from_numpy(
                 (rand_num < prob_).astype('float32')))
         else:
             # Infer decisions
             s_binary = torch.round(s_prob).detach()
         debuglogger.debug(f'stop decisions: {s_binary.size()}')
-        debuglogger.debug(f'stop decisions: {s_binary}')
+        # debuglogger.debug(f'stop decisions: {s_binary}')
 
         # Predict classes
         # y: batch_size * num_classes
-        y = self.predict_classes(h_c, desc_proc)
+        y = self.predict_classes(h_c, desc_proc, batch_size)
         y_scores = F.softmax(y, dim=1).detach()
         debuglogger.debug(f'y_scores: {y_scores.size()}')
-        debuglogger.debug(f'y_scores: {y_scores}')
+        # debuglogger.debug(f'y_scores: {y_scores}')
 
         # Generate message
         w, w_probs = self.message_generator(y_scores, h_c, desc_proc, training)

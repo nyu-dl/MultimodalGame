@@ -121,9 +121,11 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
     target: index of correct textual description
     """
     # Read data
+    debuglogger.info(f'Reading in dataset...')
     load_cmd = 'load(' + data_path + ')'
     data = dataset(dtype=ds_type, name=name, config=load_cmd)
     generated = data.generate(n=size, mode=mode)
+    debuglogger.info(f'Dataset read...')
     order = list(range(size))
     assert len(generated['texts_str']) == size
 
@@ -150,7 +152,7 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
     for i in range(num_batches):
         batch_indices = sorted(order[i * batch_size:(i + 1) * batch_size])
         batch = dict()
-        debuglogger.info(f'batch idxs: {batch_indices}')
+        debuglogger.debug(f'batch idxs: {batch_indices}')
 
         # Upscale images and convert to tensors
         ims = generated['world'][batch_indices]
@@ -158,13 +160,13 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         batch['images'] = torch.from_numpy(ims).float().permute(0, 3, 1, 2)
 
         # Extract target and texts
-        batch['target'] = torch.from_numpy(generated['target'][batch_indices]).int()
+        batch['target'] = torch.from_numpy(generated['target'][batch_indices]).long()
         batch["texts_str"] = [generated['texts_str'][j] for j in batch_indices]
         batch["texts_int"] = [texts_int[j] for j in batch_indices]
 
         # Generate p
         batch['p'] = torch.from_numpy(np.random.rand(batch_size))
-        debuglogger.debug(f'p: {batch["p"]}')
+        # debuglogger.debug(f'p: {batch["p"]}')
 
         # Mask images
         (bs, ch, width, height) = batch['images'].shape
@@ -193,8 +195,8 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         if cuda:
             m_im_1 = m_im_1.cuda()
             m_im_2 = m_im_2.cuda()
-        batch["im_feats_1"] = model(m_im_1, request=img_feats)[0]
-        batch["im_feats_2"] = model(m_im_2, request=img_feats)[0]
+        batch["im_feats_1"] = (model(m_im_1, request=img_feats)[0]).detach()
+        batch["im_feats_2"] = (model(m_im_2, request=img_feats)[0]).detach()
         yield batch
 
 

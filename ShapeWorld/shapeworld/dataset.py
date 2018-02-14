@@ -228,9 +228,10 @@ class Dataset(object):
         with util.Archive(path=path, mode='w', archive=archive) as write_file:
             for value_name, value in generated.items():
                 if self.values[value_name] == 'skip':
-                    print(f'Skipping serializing {value_name}')
+                    # print(f'Skipping serializing {value_name}')
+                    pass
                 else:
-                    print(f'Serializing {value_name}')
+                    # print(f'Serializing {value_name}')
                     Dataset.serialize_value(
                         value=value,
                         value_name=value_name,
@@ -383,7 +384,7 @@ class Dataset(object):
             return value
         elif value_type == 'str_list_list':
             value = read_file(value_name + '.txt')
-            value = [[caption for caption in cap_list.split(' || ')] for cap_list in value.split('\n')[:-1]] 
+            value = [[caption for caption in cap_list.split(' || ')] for cap_list in value.split('\n')[:-1]]
             return value
         else:
             assert word2id
@@ -422,7 +423,7 @@ class LoadedDataset(Dataset):
                 mode = root[len(self.directory) + 1:]
                 if dirs:
                     assert all(d[:4] == 'part' and d[4:].isdigit() for d in dirs)
-                    print(dirs, files)
+                    # print(dirs, files)
                     assert not files
                     self.parts[mode] = [os.path.join(root, d) for d in dirs]
                 else:
@@ -478,9 +479,10 @@ class LoadedDataset(Dataset):
             with util.Archive(path=path, mode='r', archive=self.archive) as read_file:
                 for value_name, value in self.loaded.items():
                     if self.values[value_name] == 'skip':
-                        print(f'Skipping deserializing {value_name}')
+                        # print(f'Skipping deserializing {value_name}')
+                        pass
                     else:
-                        print(f'Deserializing {value_name}')
+                        # print(f'Deserializing {value_name}')
                         value.extend(Dataset.deserialize_value(
                             value_name=value_name,
                             value_type=self.values[value_name],
@@ -910,9 +912,9 @@ class TextSelectionDataset(CaptionAgreementDataset):
                 caption += self.idx2word[captions[i][j]] + " "
             captions_str.append(caption)
         return captions_str
-    
+
     def generate(self, n, mode=None, noise_range=None, include_model=False, alternatives=False):
-        print(f'\nBatch size: {n}, Number of texts: {self.number_texts}') 
+        print(f'\nBatch size: {n}, Number of texts: {self.number_texts}')
         batch = super(TextSelectionDataset, self).generate(n, mode=mode, noise_range=noise_range, include_model=include_model, alternatives=alternatives)
         assert np.sum(batch['agreement']) == batch['agreement'].shape[0]
         batch = self.add_caption_lists(batch, n)

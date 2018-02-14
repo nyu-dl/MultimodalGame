@@ -136,6 +136,12 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
 
     # Create feature extraction model
     model = FeatureModel()
+    model.fn.eval()
+    model.eval()
+
+    if cuda:
+        model.fn.cuda()
+        model.cuda()
 
     # Shuffle
     if shuffle:

@@ -145,10 +145,11 @@ class TextProcessor(nn.Module):
 class MessageProcessor(nn.Module):
     '''Processes a received message from an agent'''
 
-    def __init__(self, m_dim, hid_dim):
+    def __init__(self, m_dim, hid_dim, cuda):
         super(MessageProcessor, self).__init__()
         self.m_dim = m_dim
         self.hid_dim = hid_dim
+        self.use_cuda = cuda
         self.rnn = nn.GRUCell(self.m_dim, self.hid_dim)
         self.reset_parameters()
 
@@ -161,7 +162,9 @@ class MessageProcessor(nn.Module):
             return self.rnn(m, h)
         else:
             debuglogger.debug(f'Ignoring message, using blank instead...')
-            blank_msg = torch.zeros_like(m)
+            blank_msg = _Variable(torch.zeros_like(m.data))
+            if self.use_cuda:
+                blank_msg = blank_msg.cuda()
             return self.rnn(blank_msg, h)
 
 
@@ -259,7 +262,8 @@ class Agent(nn.Module):
                  use_binary,
                  use_attn,
                  attn_dim,
-                 use_MLP):
+                 use_MLP,
+                 cuda):
         super(Agent, self).__init__()
         self.im_feature_type = im_feature_type
         self.im_feat_dim = im_feat_dim
@@ -272,10 +276,11 @@ class Agent(nn.Module):
         self.use_attn = use_attn
         self.use_MLP = use_MLP
         self.attn_dim = attn_dim
+        self.use_cuda = cuda
         self.image_processor = ImageProcessor(
             im_feat_dim, h_dim, use_attn, attn_dim)
         self.text_processor = TextProcessor(desc_dim, h_dim)
-        self.message_processor = MessageProcessor(m_dim, h_dim)
+        self.message_processor = MessageProcessor(m_dim, h_dim, cuda)
         self.message_generator = MessageGenerator(m_dim, h_dim, use_binary)
         self.reward_estimator = RewardEstimator(h_dim)
         # Network for combining processed image and message representations
@@ -311,7 +316,10 @@ class Agent(nn.Module):
         self.image_processor.reset_state()
 
     def initial_state(self, batch_size):
-        return _Variable(torch.zeros(batch_size, self.h_dim))
+        h = _Variable(torch.zeros(batch_size, self.h_dim))
+        if self.use_cuda:
+            h = h.cuda()
+        return h
 
     def predict_classes(self, h_c, desc_proc, batch_size):
         '''
@@ -432,6 +440,8 @@ class Agent(nn.Module):
             # debuglogger.debug(f'prob: {prob_}')
             s_binary = _Variable(torch.from_numpy(
                 (rand_num < prob_).astype('float32')))
+            if self.use_cuda:
+                s_binary = s_binary.cuda()
         else:
             # Infer decisions
             s_binary = torch.round(s_prob).detach()

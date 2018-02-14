@@ -402,7 +402,7 @@ def exchange(agent1, agent2, exchange_args):
     y_2_nc = y_2e
 
     for i_exchange in range(FLAGS.max_exchange):
-        debuglogger.info(
+        debuglogger.debug(
             f' ================== EXCHANGE {i_exchange} ====================')
         # The messages are now used
         use_message = True
@@ -728,7 +728,8 @@ def run():
                    use_binary=FLAGS.use_binary,
                    use_attn=FLAGS.visual_attn,
                    attn_dim=FLAGS.attn_dim,
-                   use_MLP=FLAGS.use_MLP)
+                   use_MLP=FLAGS.use_MLP,
+                   cuda=FLAGS.cuda)
 
     flogger.Log("Agent 1 Architecture: {}".format(agent1))
     total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
@@ -745,7 +746,8 @@ def run():
                    use_binary=FLAGS.use_binary,
                    use_attn=FLAGS.visual_attn,
                    attn_dim=FLAGS.attn_dim,
-                   use_MLP=FLAGS.use_MLP)
+                   use_MLP=FLAGS.use_MLP,
+                   cuda=FLAGS.cuda)
 
     flogger.Log("Agent 2 Architecture: {}".format(agent2))
     total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
@@ -858,7 +860,7 @@ def run():
 
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
-            debuglogger.debug(f'Generated batch {i_batch}')
+            debuglogger.debug(f'Batch {i_batch}')
 
             target = batch["target"]  # Converted to Variable in get_classification_loss_and_stats
             im_feats_1 = batch["im_feats_1"]  # Already Variable

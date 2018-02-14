@@ -18,7 +18,9 @@ This model used ShapeWorld datasets. To generate a demo dataset run the followin
 
 ```
 mkdir data
-./ShapeWorld/build_datasets.sh
+cd ShapeWorld
+./build_datasets.sh
+cd ..
 ```
 
 This model also depends on pretrained word embeddings. We recommend using the `6B.100d` GloVe embeddings available [here](https://nlp.stanford.edu/projects/glove/).
@@ -28,6 +30,7 @@ This model also depends on pretrained word embeddings. We recommend using the `6
 Here is an example command for running the agents in a "Fixed" setting. Alternatively run the following command to train this model.
 
 ```
+mkdir logs
 ./run.sh
 ```
 

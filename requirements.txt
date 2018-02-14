@@ -5,3 +5,4 @@ parse
 python-gflags
 sklearn
 tqdm
+scikit-image

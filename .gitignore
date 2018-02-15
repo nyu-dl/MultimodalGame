@@ -1,3 +1,4 @@
+local_run.sh
 data
 utils/downloaded
 *.hdf5

@@ -36,6 +36,9 @@ from sparks import sparks
 import gflags
 FLAGS = gflags.FLAGS
 
+SHAPES = ['circle', 'cross', 'ellipse', 'pentagon', 'rectangle', 'semicircle', 'square', 'triangle']
+COLORS = ['blue', 'cyan', 'gray', 'green', 'magenta', 'red', 'yellow']
+
 
 def Variable(*args, **kwargs):
     var = _Variable(*args, **kwargs)
@@ -76,6 +79,30 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
     """
 
     extra = dict()
+    correct_to_save = {"masked_im_1": [],
+                       "masked_im_2": [],
+                       "p": [],
+                       "target": [],
+                       "caption": [],
+                       "texts": []
+                       }
+    incorrect_to_save = {"masked_im_1": [],
+                         "masked_im_2": [],
+                         "p": [],
+                         "target": [],
+                         "caption": [],
+                         "texts": []
+                         }
+
+    shapes_accuracy = {}
+    for s in SHAPES:
+        shapes_accuracy[s] = {"correct": 0,
+                              "total": 0}
+
+    colors_accuracy = {}
+    for c in COLORS:
+        colors_accuracy[c] = {"correct": 0,
+                              "total": 0}
 
     # Keep track of conversation lengths
     conversation_lengths_1 = []
@@ -219,7 +246,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
         debuglogger.debug(f'eval atleast1 correct nc: {atleast1_correct_nc}')
 
         # Keep track of conversation lengths
-        # TODO not relavant yet
+        # TODO not relevant yet
         conversation_lengths_1 += torch.cat(s_feats_1,
                                             1).data.float().sum(1).view(-1).tolist()
         conversation_lengths_2 += torch.cat(s_feats_2,
@@ -1534,7 +1561,7 @@ def default_flags():
     if not FLAGS.id_eval_csv_file:
         FLAGS.id_eval_csv_file = os.path.join(
             FLAGS.log_path, FLAGS.experiment_name + ".id_eval.csv")
-    
+
     if not FLAGS.ood_eval_csv_file:
         FLAGS.ood_eval_csv_file = os.path.join(
             FLAGS.log_path, FLAGS.experiment_name + ".ood_eval.csv")

@@ -94,6 +94,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
                          "texts": []
                          }
 
+    # Keep track of shapes and color accuracy
     shapes_accuracy = {}
     for s in SHAPES:
         shapes_accuracy[s] = {"correct": 0,
@@ -103,6 +104,19 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
     for c in COLORS:
         colors_accuracy[c] = {"correct": 0,
                               "total": 0}
+
+    # Keep track of agent specific performance (given other agent gets it both right)
+    agent1_performance = {"11": 0,  # both right
+                          "01": 0,  # wrong before comms, right after
+                          "10": 0,  # right before comms, wrong after
+                          "00": 0,  # both wrong
+                          "total": 0}
+
+    agent2_performance = {"11": 0,  # both right
+                          "01": 0,  # wrong before comms, right after
+                          "10": 0,  # right before comms, wrong after
+                          "00": 0,  # both wrong
+                          "total": 0}
 
     # Keep track of conversation lengths
     conversation_lengths_1 = []
@@ -245,6 +259,88 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
         debuglogger.debug(f'eval atleast1 correct com: {atleast1_correct_com}')
         debuglogger.debug(f'eval atleast1 correct nc: {atleast1_correct_nc}')
 
+        debuglogger.debug(f'batch agent 1 nc correct: {correct_1_nc}')
+        debuglogger.debug(f'batch agent 1 com correct: {correct_1}')
+        debuglogger.debug(f'batch agent 2 nc correct: {correct_2_nc}')
+        debuglogger.debug(f'batch agent 2 com correct: {correct_2}')
+
+        # Track agent specific stats
+        # Agent 1 given Agent 2 both correct
+        a2_idx = (correct_2_nc.float() + correct_2.float()) == 2
+        a1_00 = (a2_idx & ((correct_1_nc.float() + correct_1.float()) == 0)).sum()
+        a1_10 = (a2_idx & ((correct_1_nc.float() + (1 - correct_1.float()) == 2))).sum()
+        a1_01 = (a2_idx & (((1 - correct_1_nc.float()) + correct_1.float()) == 2)).sum()
+        a1_11 = (a2_idx & ((correct_1_nc.float() + correct_1.float()) == 2)).sum()
+        a1_tot = a2_idx.sum()
+        assert a1_tot == (a1_00 + a1_01 + a1_10 + a1_11)
+
+        agent1_performance["11"] += a1_11
+        agent1_performance["01"] += a1_01
+        agent1_performance["10"] += a1_10
+        agent1_performance["00"] += a1_00
+        agent1_performance["total"] += a1_tot
+
+        # Agent 2 given Agent 1 both correct
+        a1_idx = (correct_1_nc.float() + correct_2.float()) == 2
+        a2_00 = (a1_idx & ((correct_2_nc.float() + correct_2.float()) == 0)).sum()
+        a2_10 = (a1_idx & ((correct_2_nc.float() + (1 - correct_2.float()) == 2))).sum()
+        a2_01 = (a1_idx & (((1 - correct_2_nc.float()) + correct_2.float()) == 2)).sum()
+        a2_11 = (a1_idx & ((correct_2_nc.float() + correct_2.float()) == 2)).sum()
+        a2_tot = a1_idx.sum()
+        assert a2_tot == (a2_00 + a2_01 + a2_10 + a2_11)
+
+        agent2_performance["11"] += a2_11
+        agent2_performance["01"] += a2_01
+        agent2_performance["10"] += a2_10
+        agent2_performance["00"] += a2_00
+        agent2_performance["total"] += a2_tot
+
+        debuglogger.debug('Agent 1: total {}, 11: {}, 01: {} 00: {}, 10: {}'.format(
+            agent1_performance["total"],
+            agent1_performance["11"],
+            agent1_performance["01"],
+            agent1_performance["00"],
+            agent1_performance["10"]))
+        if agent1_performance["total"] > 0:
+            debuglogger.debug('Agent 1: total {}, 11: {}, 01: {} 00: {}, 10: {}'.format(
+                agent1_performance["total"] / agent1_performance["total"],
+                agent1_performance["11"] / agent1_performance["total"],
+                agent1_performance["01"] / agent1_performance["total"],
+                agent1_performance["00"] / agent1_performance["total"],
+                agent1_performance["10"] / agent1_performance["total"]))
+
+        debuglogger.debug('Agent 2: total {}, 11: {}, 01: {} 00: {}, 10: {}'.format(
+            agent2_performance["total"],
+            agent2_performance["11"],
+            agent2_performance["01"],
+            agent2_performance["00"],
+            agent2_performance["10"]))
+        if agent2_performance["total"] > 0:
+            debuglogger.debug('Agent 2: total {}, 11: {}, 01: {} 00: {}, 10: {}'.format(
+                agent2_performance["total"] / agent2_performance["total"],
+                agent2_performance["11"] / agent2_performance["total"],
+                agent2_performance["01"] / agent2_performance["total"],
+                agent2_performance["00"] / agent2_performance["total"],
+                agent2_performance["10"] / agent2_performance["total"]))
+
+        # Gather shape and color stats
+        correct_indices_nc = batch_correct_nc == 2
+        correct_indices_com = batch_correct_com == 2
+        for _i in range(_batch_size):
+            if batch['shapes'][_i] is not None:
+                shape = batch['shapes'][_i]
+                shapes_accuracy[shape]["total"] += 1
+                if correct_indices_com[_i]:
+                    shapes_accuracy[shape]["correct"] += 1
+            if batch['colors'][_i] is not None:
+                color = batch['colors'][_i]
+                colors_accuracy[color]["total"] += 1
+                if correct_indices_com[_i]:
+                    colors_accuracy[color]["correct"] += 1
+
+        # debuglogger.debug(f'shapes dict: {shapes_accuracy}')
+        # debuglogger.debug(f'colors dict: {colors_accuracy}')
+
         # Keep track of conversation lengths
         # TODO not relevant yet
         conversation_lengths_1 += torch.cat(s_feats_1,
@@ -318,6 +414,10 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
     extra['conversation_lengths_2_std'] = conversation_lengths_2.std()
     extra['hamming_1_mean'] = hamming_1.mean()
     extra['hamming_2_mean'] = hamming_2.mean()
+    extra['shapes_accuracy'] = shapes_accuracy
+    extra['colors_accuracy'] = colors_accuracy
+    extra['agent1_performance'] = agent1_performance
+    extra['agent2_performance'] = agent2_performance
 
     debuglogger.debug(f'Eval total size: {total}')
     total_accuracy_nc = total_correct_nc / total
@@ -356,6 +456,36 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
                val=extra['hamming_1_mean'], step=step)
     logger.log(key=domain + "Hamming 2 (avg)",
                val=extra['hamming_2_mean'], step=step)
+    if extra['agent1_performance']["total"] > 0:
+        logger.log(key=domain + " Development Accuracy: Agent 1 given Agent 2 both right: 01: ",
+                   val=extra['agent1_performance']["01"] / extra['agent1_performance']["total"], step=step)
+        logger.log(key=domain + " Development Accuracy: Agent 1 given Agent 2 both right: 11: ",
+                   val=extra['agent1_performance']["11"] / extra['agent1_performance']["total"], step=step)
+        logger.log(key=domain + " Development Accuracy: Agent 1 given Agent 2 both right: 00: ",
+                   val=extra['agent1_performance']["00"] / extra['agent1_performance']["total"], step=step)
+        logger.log(key=domain + " Development Accuracy: Agent 1 given Agent 2 both right: 10: ",
+                   val=extra['agent1_performance']["10"] / extra['agent1_performance']["total"], step=step)
+    else:
+        logger.log(key=domain + " Development Accuracy: Agent 1 given Agent 2 both right: 0 examples",
+                   val=None, step=step)
+    if extra['agent2_performance']["total"] > 0:
+        logger.log(key=domain + " Development Accuracy: Agent 2 given Agent 1 both right: 01: ",
+                   val=extra['agent2_performance']["01"] / extra['agent2_performance']["total"], step=step)
+        logger.log(key=domain + " Development Accuracy: Agent 2 given Agent 1 both right: 11: ",
+                   val=extra['agent2_performance']["11"] / extra['agent2_performance']["total"], step=step)
+        logger.log(key=domain + " Development Accuracy: Agent 2 given Agent 1 both right: 00: ",
+                   val=extra['agent2_performance']["00"] / extra['agent2_performance']["total"], step=step)
+        logger.log(key=domain + " Development Accuracy: Agent 2 given Agent 1 both right: 10: ",
+                   val=extra['agent2_performance']["10"] / extra['agent2_performance']["total"], step=step)
+    else:
+        logger.log(key=domain + " Development Accuracy: Agent 1 given Agent 2 both right: 0 examples",
+                   val=None, step=step)
+    for k in extra['shapes_accuracy']:
+        if extra['shapes_accuracy'][k]['total'] > 0:
+            logger.log(key=domain + " Development Accuracy: " + k + " ", val=extra['shapes_accuracy'][k]['correct'] / extra['shapes_accuracy'][k]['total'], step=step)
+    for k in extra['colors_accuracy']:
+        if extra['colors_accuracy'][k]['total'] > 0:
+            logger.log(key=domain + " Development Accuracy: " + k + " ", val=extra['colors_accuracy'][k]['correct'] / extra['colors_accuracy'][k]['total'], step=step)
 
     flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, both right, no comms: {}".format(
         epoch, step, i_batch, domain, dev_accuracy_log['total_acc_both_nc'][-1]))
@@ -373,6 +503,50 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
 
     flogger.Log("Epoch: {} Step: {} Batch: {} {} Mean Hamming Distance (1/2): {}/{}"
                 .format(epoch, step, i_batch, domain, extra['hamming_1_mean'], extra['hamming_2_mean']))
+
+    flogger.Log('Agent 1: total {}, 11: {}, 01: {} 00: {}, 10: {}'.format(
+        extra["agent1_performance"]["total"],
+        extra["agent1_performance"]["11"],
+        extra["agent1_performance"]["01"],
+        extra["agent1_performance"]["00"],
+        extra["agent1_performance"]["10"]))
+    if extra["agent1_performance"]["total"] > 0:
+        flogger.Log('Agent 1: total {}, 11: {}, 01: {} 00: {}, 10: {}'.format(
+            extra["agent1_performance"]["total"] / extra["agent1_performance"]["total"],
+            extra["agent1_performance"]["11"] / extra["agent1_performance"]["total"],
+            extra["agent1_performance"]["01"] / extra["agent1_performance"]["total"],
+            extra["agent1_performance"]["00"] / extra["agent1_performance"]["total"],
+            extra["agent1_performance"]["10"] / extra["agent1_performance"]["total"]))
+
+    flogger.Log('Agent 2: total {}, 11: {}, 01: {} 00: {}, 10: {}'.format(
+        extra["agent2_performance"]["total"],
+        extra["agent2_performance"]["11"],
+        extra["agent2_performance"]["01"],
+        extra["agent2_performance"]["00"],
+        extra["agent2_performance"]["10"]))
+    if extra["agent2_performance"]["total"] > 0:
+        flogger.Log('Agent 2: total {}, 11: {}, 01: {} 00: {}, 10: {}'.format(
+            extra["agent2_performance"]["total"] / extra["agent2_performance"]["total"],
+            extra["agent2_performance"]["11"] / extra["agent2_performance"]["total"],
+            extra["agent2_performance"]["01"] / extra["agent2_performance"]["total"],
+            extra["agent2_performance"]["00"] / extra["agent2_performance"]["total"],
+            extra["agent2_performance"]["10"] / extra["agent2_performance"]["total"]))
+
+    for k in extra['shapes_accuracy']:
+        if extra['shapes_accuracy'][k]['total'] > 0:
+            flogger.Log('{}: total: {}, correct: {}, accuracy: {}'.format(
+                k,
+                extra['shapes_accuracy'][k]['total'],
+                extra['shapes_accuracy'][k]['correct'],
+                extra['shapes_accuracy'][k]['correct'] / extra['shapes_accuracy'][k]['total']))
+    for k in extra['colors_accuracy']:
+        if extra['colors_accuracy'][k]['total'] > 0:
+            flogger.Log('{}: total: {}, correct: {}, accuracy: {}'.format(
+                k,
+                extra['colors_accuracy'][k]['total'],
+                extra['colors_accuracy'][k]['correct'],
+                extra['colors_accuracy'][k]['correct'] / extra['colors_accuracy'][k]['total']))
+
     return dev_accuracy_log, total_accuracy_com
 
 
@@ -1343,11 +1517,11 @@ def run():
 
             # Increment batch step
             step += 1
-            # break
+            break
 
         # Increment epoch
         epoch += 1
-        # break
+        break
 
     flogger.Log("Finished training.")
 

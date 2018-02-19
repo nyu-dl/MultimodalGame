@@ -560,7 +560,7 @@ def corrupt_message(corrupt_region, agent, binary_message):
     return binary_message
 
 
-def exchange(agent1, agent2, exchange_args):
+def exchange(a1, a2, exchange_args):
     """Run a batched conversation between two agents.
 
     There are two parts to an exchange:
@@ -580,8 +580,8 @@ def exchange(agent1, agent2, exchange_args):
         break_early: Boolean value. If True, then terminate batched conversation if both agents are satisfied
 
     Function Args:
-        agent1: agent1
-        agent2: agent2
+        a1: agent1
+        a2: agent2
         exchange_args: Other useful arguments.
 
     Returns:
@@ -593,6 +593,19 @@ def exchange(agent1, agent2, exchange_args):
         r_1: Estimated rewards of agent_1.
         r_2: Estimated rewards of agent_2.
     """
+
+    # Randomly select which agent goes first
+    who_goes_first = None
+    if random.random() < 0.5:
+        agent1 = a1
+        agent2 = a2
+        who_goes_first = 1
+        debuglogger.debug(f'Agent 1 communicates first')
+    else:
+        agent1 = a2
+        agent2 = a1
+        who_goes_first = 2
+        debuglogger.debug(f'Agent 2 communicates first')
 
     data = exchange_args["data"]
     # TODO extend implementation to include data context
@@ -667,8 +680,14 @@ def exchange(agent1, agent2, exchange_args):
             train)
 
     # Add no message selections to results
-    y_1_nc = y_1e
-    y_2_nc = y_2e
+    # Need to be consistent about storing the a1 and a2's even though their roles are randomized during each exchange
+    # agent1 and agent2 is a local name that refers to the order of communication. Storage refers to global labels a1 and a2
+    if who_goes_first == 1:
+        y_1_nc = y_1e
+        y_2_nc = y_2e
+    else:
+        y_1_nc = y_2e
+        y_2_nc = y_1e
 
     for i_exchange in range(FLAGS.max_exchange):
         debuglogger.debug(
@@ -725,20 +744,38 @@ def exchange(agent1, agent2, exchange_args):
 
         # Save for later
         # TODO check stop mask
-        stop_mask_1.append(torch.min(stop_mask_1[-1], s_binary_1.byte()))
-        stop_mask_2.append(torch.min(stop_mask_2[-1], s_binary_2.byte()))
-        stop_feat_1.append(s_binary_1)
-        stop_feat_2.append(s_binary_2)
-        stop_prob_1.append(s_prob_1)
-        stop_prob_2.append(s_prob_2)
-        feats_1.append(m_binary_1)
-        feats_2.append(m_binary_2)
-        probs_1.append(m_probs_1)
-        probs_2.append(m_probs_2)
-        y_1.append(y_1e)
-        y_2.append(y_2e)
-        r_1.append(r_1e)
-        r_2.append(r_2e)
+        # Need to be consistent about storing the a1 and a2's even though their roles are randomized during each exchange
+        # agent1 and agent2 is a local name that refers to the order of communication. Storage refers to global labels a1 and a2
+        if who_goes_first == 1:
+            stop_mask_1.append(torch.min(stop_mask_1[-1], s_binary_1.byte()))
+            stop_mask_2.append(torch.min(stop_mask_2[-1], s_binary_2.byte()))
+            stop_feat_1.append(s_binary_1)
+            stop_feat_2.append(s_binary_2)
+            stop_prob_1.append(s_prob_1)
+            stop_prob_2.append(s_prob_2)
+            feats_1.append(m_binary_1)
+            feats_2.append(m_binary_2)
+            probs_1.append(m_probs_1)
+            probs_2.append(m_probs_2)
+            y_1.append(y_1e)
+            y_2.append(y_2e)
+            r_1.append(r_1e)
+            r_2.append(r_2e)
+        else:
+            stop_mask_1.append(torch.min(stop_mask_2[-1], s_binary_2.byte()))
+            stop_mask_2.append(torch.min(stop_mask_1[-1], s_binary_1.byte()))
+            stop_feat_1.append(s_binary_2)
+            stop_feat_2.append(s_binary_1)
+            stop_prob_1.append(s_prob_2)
+            stop_prob_2.append(s_prob_1)
+            feats_1.append(m_binary_2)
+            feats_2.append(m_binary_1)
+            probs_1.append(m_probs_2)
+            probs_2.append(m_probs_1)
+            y_1.append(y_2e)
+            y_2.append(y_1e)
+            r_1.append(r_2e)
+            r_2.append(r_1e)
 
         # Terminate exchange if everyone is done conversing
         if break_early and stop_mask_1[-1].float().sum().data[0] == 0 and stop_mask_2[-1].float().sum().data[0] == 0:
@@ -1517,11 +1554,11 @@ def run():
 
             # Increment batch step
             step += 1
-            break
+            # break
 
         # Increment epoch
         epoch += 1
-        break
+        # break
 
     flogger.Log("Finished training.")
 

@@ -281,7 +281,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
         agent1_performance["total"] += a1_tot
 
         # Agent 2 given Agent 1 both correct
-        a1_idx = (correct_1_nc.float() + correct_2.float()) == 2
+        a1_idx = (correct_1_nc.float() + correct_1.float()) == 2
         a2_00 = (a1_idx & ((correct_2_nc.float() + correct_2.float()) == 0)).sum()
         a2_10 = (a1_idx & ((correct_2_nc.float() + (1 - correct_2.float()) == 2))).sum()
         a2_01 = (a1_idx & (((1 - correct_2_nc.float()) + correct_2.float()) == 2)).sum()

@@ -302,7 +302,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
     return total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra
 
 
-def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain):
+def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch):
     total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
         dataset_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval, callback=None)
     dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
@@ -317,35 +317,35 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
                val=dev_accuracy_log['total_acc_atl1_nc'][-1], step=step)
     logger.log(key=domain + "Development Accuracy, at least 1 right, after comms",
                val=dev_accuracy_log['total_acc_atl1_com'][-1], step=step)
-    logger.log(key="Conversation Length A1 (avg)",
+    logger.log(key=domain + "Conversation Length A1 (avg)",
                val=extra['conversation_lengths_1_mean'], step=step)
-    logger.log(key="Conversation Length A1 (std)",
+    logger.log(key=domain + "Conversation Length A1 (std)",
                val=extra['conversation_lengths_1_std'], step=step)
-    logger.log(key="Conversation Length A2 (avg)",
+    logger.log(key=domain + "Conversation Length A2 (avg)",
                val=extra['conversation_lengths_2_mean'], step=step)
-    logger.log(key="Conversation Length A2 (std)",
+    logger.log(key=domain + "Conversation Length A2 (std)",
                val=extra['conversation_lengths_2_std'], step=step)
-    logger.log(key="Hamming 1 (avg)",
+    logger.log(key=domain + "Hamming 1 (avg)",
                val=extra['hamming_1_mean'], step=step)
-    logger.log(key="Hamming 2 (avg)",
+    logger.log(key=domain + "Hamming 2 (avg)",
                val=extra['hamming_2_mean'], step=step)
 
     flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, both right, no comms: {}".format(
-        epoch, step, i_batch, domain, dev_accuracy['total_acc_both_nc'][-1]))
+        epoch, step, i_batch, domain, dev_accuracy_log['total_acc_both_nc'][-1]))
     flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, both right, after comms: {}".format(
-        epoch, step, i_batch, domain, dev_accuracy['total_acc_both_com'][-1]))
+        epoch, step, i_batch, domain, dev_accuracy_log['total_acc_both_com'][-1]))
     flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, at least right, no comms: {}".format(
-        epoch, step, i_batch, domain, dev_accuracy['total_acc_atl1_nc'][-1]))
+        epoch, step, i_batch, domain, dev_accuracy_log['total_acc_atl1_nc'][-1]))
     flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, at least 1 right, after comms: {}".format(
-        epoch, step, i_batch, domain, dev_accuracy['total_acc_atl1_com'][-1]))
+        epoch, step, i_batch, domain, dev_accuracy_log['total_acc_atl1_com'][-1]))
 
-    flogger.Log("Epoch: {} Step: {} Batch: {} Conversation Length 1 (avg/std): {}/{}".format(epoch,
-                                                                                             step, i_batch, extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std']))
-    flogger.Log("Epoch: {} Step: {} Batch: {} Conversation Length 2 (avg/std): {}/{}".format(epoch,
-                                                                                             step, i_batch, extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Conversation Length 1 (avg/std): {}/{}".format(
+        epoch, step, i_batch, domain, extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std']))
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Conversation Length 2 (avg/std): {}/{}".format(
+        epoch, step, i_batch, domain, extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
 
-    flogger.Log("Epoch: {} Step: {} Batch: {} Mean Hamming Distance (1/2): {}/{}"
-                .format(epoch, step, i_batch, extra['hamming_1_mean'], extra['hamming_2_mean']))
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Mean Hamming Distance (1/2): {}/{}"
+                .format(epoch, step, i_batch, domain, extra['hamming_1_mean'], extra['hamming_2_mean']))
     return dev_accuracy_log, total_accuracy_com
 
 
@@ -1293,7 +1293,7 @@ def run():
             if step % FLAGS.log_dev == 0:
                 # Report in domaind development accuracy and checkpoint if best result
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain")
+                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch)
                 if step >= FLAGS.save_after and total_accuracy_com > best_dev_acc:
                     best_dev_acc = total_accuracy_com
                     flogger.Log(
@@ -1304,7 +1304,7 @@ def run():
                                optimizers_dict, gpu=0 if FLAGS.cuda else -1)
                 # Report out of domain development accuracy
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "In Domain")
+                    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch)
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:
@@ -1385,7 +1385,8 @@ def flags():
     gflags.DEFINE_string("conf_mat", None, "Path to save confusion matrix")
     gflags.DEFINE_string("log_path", "./logs", "Path to save logs")
     gflags.DEFINE_string("log_file", None, "")
-    gflags.DEFINE_string("eval_csv_file", None, "Path to eval log file")
+    gflags.DEFINE_string("id_eval_csv_file", None, "Path to in domain eval log file")
+    gflags.DEFINE_string("ood_eval_csv_file", None, "Path to out of domain  eval log file")
     gflags.DEFINE_string(
         "json_file", None, "Where to store all flags for an experiment")
     gflags.DEFINE_string("log_load", None, "")
@@ -1413,6 +1414,8 @@ def flags():
                          "What type of dataset to use")
     gflags.DEFINE_string(
         "dataset_path", "./Shapeworld/data/oneshape_simple_textselect", "Root directory of the dataset")
+    gflags.DEFINE_string(
+        "dataset_indomain_valid_path", "./Shapeworld/data/oneshape_valid/oneshape_simple_textselect", "Root directory of the in domain validation dataset")
     gflags.DEFINE_string("dataset_mode", "train", "")
     gflags.DEFINE_enum("dataset_eval_mode", "validation",
                        ["validation", "test"], "")
@@ -1528,9 +1531,13 @@ def default_flags():
         FLAGS.log_file = os.path.join(
             FLAGS.log_path, FLAGS.experiment_name + ".log")
 
-    if not FLAGS.eval_csv_file:
-        FLAGS.eval_csv_file = os.path.join(
-            FLAGS.log_path, FLAGS.experiment_name + ".eval.csv")
+    if not FLAGS.id_eval_csv_file:
+        FLAGS.id_eval_csv_file = os.path.join(
+            FLAGS.log_path, FLAGS.experiment_name + ".id_eval.csv")
+    
+    if not FLAGS.ood_eval_csv_file:
+        FLAGS.ood_eval_csv_file = os.path.join(
+            FLAGS.log_path, FLAGS.experiment_name + ".ood_eval.csv")
 
     if not FLAGS.json_file:
         FLAGS.json_file = os.path.join(

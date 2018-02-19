@@ -106,7 +106,8 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
     else:
         eval_mode = FLAGS.dataset_eval_mode
         debuglogger.info("Evaluating on out of domain validation set")
-    dev_loader = load_shapeworld_dataset(dataset_path, FLAGS.glove_path, eval_mode, FLAGS.dataset_size_dev, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
+    dev_loader = load_shapeworld_dataset(dataset_path, FLAGS.glove_path, eval_mode, FLAGS.dataset_size_dev, FLAGS.dataset_type, FLAGS.dataset_name,
+                                         FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
 
     for batch in dev_loader:
         target = batch["target"]
@@ -136,7 +137,8 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
         exchange_args["train"] = True
         exchange_args["break_early"] = not FLAGS.fixed_exchange
 
-        s, message_1, message_2, y_all, r = exchange(agent1, agent2, exchange_args)
+        s, message_1, message_2, y_all, r = exchange(
+            agent1, agent2, exchange_args)
 
         s_masks_1, s_feats_1, s_probs_1 = s[0]
         s_masks_2, s_feats_2, s_probs_2 = s[1]
@@ -164,14 +166,18 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
 
         # Obtain predictions, loss and stats agent 1
         # Before communication predictions
-        (dist_1_nc, maxdist_1_nc, argmax_1_nc, ent_1_nc, nll_loss_1_nc, logs_1_nc) = get_classification_loss_and_stats(y_nc[0], target)
+        (dist_1_nc, maxdist_1_nc, argmax_1_nc, ent_1_nc, nll_loss_1_nc,
+         logs_1_nc) = get_classification_loss_and_stats(y_nc[0], target)
         # After communication predictions
-        (dist_2_nc, maxdist_2_nc, argmax_2_nc, ent_2_nc, nll_loss_2_nc, logs_2_nc) = get_classification_loss_and_stats(y_nc[1], target)
+        (dist_2_nc, maxdist_2_nc, argmax_2_nc, ent_2_nc, nll_loss_2_nc,
+         logs_2_nc) = get_classification_loss_and_stats(y_nc[1], target)
         # Obtain predictions, loss and stats agent 1
         # Before communication predictions
-        (dist_1, maxdist_1, argmax_1, ent_1, nll_loss_1_com, logs_1) = get_classification_loss_and_stats(outp_1, target)
+        (dist_1, maxdist_1, argmax_1, ent_1, nll_loss_1_com,
+         logs_1) = get_classification_loss_and_stats(outp_1, target)
         # After communication predictions
-        (dist_2, maxdist_2, argmax_2, ent_2, nll_loss_2_com, logs_2) = get_classification_loss_and_stats(outp_2, target)
+        (dist_2, maxdist_2, argmax_2, ent_2, nll_loss_2_com,
+         logs_2) = get_classification_loss_and_stats(outp_2, target)
 
         # Store top 1 prediction for confusion matrix
         pred_labels_1_nc.append(argmax_1_nc.cpu().numpy())
@@ -180,10 +186,14 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
         pred_labels_2_com.append(argmax_2.cpu().numpy())
 
         # Calculate number of correct observations for different types
-        accuracy_1_nc, correct_1_nc, top_1_1_nc = calculate_accuracy(dist_1_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
-        accuracy_1, correct_1, top_1_1 = calculate_accuracy(dist_1, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
-        accuracy_2_nc, correct_2_nc, top_1_2_nc = calculate_accuracy(dist_2_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
-        accuracy_2, correct_2, top_1_2 = calculate_accuracy(dist_2, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_1_nc, correct_1_nc, top_1_1_nc = calculate_accuracy(
+            dist_1_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_1, correct_1, top_1_1 = calculate_accuracy(
+            dist_1, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_2_nc, correct_2_nc, top_1_2_nc = calculate_accuracy(
+            dist_2_nc, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
+        accuracy_2, correct_2, top_1_2 = calculate_accuracy(
+            dist_2, target, FLAGS.batch_size_dev, FLAGS.top_k_dev)
         batch_correct_nc = correct_1_nc.float() + correct_2_nc.float()
         batch_correct_com = correct_1.float() + correct_2.float()
         batch_correct_top_1_nc = top_1_1_nc.float() + top_1_2_nc.float()
@@ -191,8 +201,10 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
 
         debuglogger.debug(f'eval batch correct com: {batch_correct_com}')
         debuglogger.debug(f'eval batch correct nc: {batch_correct_nc}')
-        debuglogger.debug(f'eval batch top 1 correct com: {batch_correct_top_1_com}')
-        debuglogger.debug(f'eval batch top 1 correct nc: {batch_correct_top_1_nc}')
+        debuglogger.debug(
+            f'eval batch top 1 correct com: {batch_correct_top_1_com}')
+        debuglogger.debug(
+            f'eval batch top 1 correct nc: {batch_correct_top_1_nc}')
 
         # Update accuracy counts
         total += float(_batch_size)
@@ -208,8 +220,10 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
 
         # Keep track of conversation lengths
         # TODO not relavant yet
-        conversation_lengths_1 += torch.cat(s_feats_1, 1).data.float().sum(1).view(-1).tolist()
-        conversation_lengths_2 += torch.cat(s_feats_2, 1).data.float().sum(1).view(-1).tolist()
+        conversation_lengths_1 += torch.cat(s_feats_1,
+                                            1).data.float().sum(1).view(-1).tolist()
+        conversation_lengths_2 += torch.cat(s_feats_2,
+                                            1).data.float().sum(1).view(-1).tolist()
 
         debuglogger.debug(f'Conversation length 1: {conversation_lengths_1}')
         debuglogger.debug(f'Conversation length 2: {conversation_lengths_2}')
@@ -288,6 +302,53 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
     return total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra
 
 
+def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain):
+    total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
+        dataset_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval, callback=None)
+    dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
+    dev_accuracy_log['total_acc_both_com'].append(total_accuracy_com)
+    dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
+    dev_accuracy_log['total_acc_atl1_com'].append(atleast1_accuracy_com)
+    logger.log(key=domain + " Development Accuracy, both right, no comms",
+               val=dev_accuracy_log['total_acc_both_nc'][-1], step=step)
+    logger.log(key=domain + "Development Accuracy, both right, after comms",
+               val=dev_accuracy_log['total_acc_both_com'][-1], step=step)
+    logger.log(key=domain + "Development Accuracy, at least 1 right, no comms",
+               val=dev_accuracy_log['total_acc_atl1_nc'][-1], step=step)
+    logger.log(key=domain + "Development Accuracy, at least 1 right, after comms",
+               val=dev_accuracy_log['total_acc_atl1_com'][-1], step=step)
+    logger.log(key="Conversation Length A1 (avg)",
+               val=extra['conversation_lengths_1_mean'], step=step)
+    logger.log(key="Conversation Length A1 (std)",
+               val=extra['conversation_lengths_1_std'], step=step)
+    logger.log(key="Conversation Length A2 (avg)",
+               val=extra['conversation_lengths_2_mean'], step=step)
+    logger.log(key="Conversation Length A2 (std)",
+               val=extra['conversation_lengths_2_std'], step=step)
+    logger.log(key="Hamming 1 (avg)",
+               val=extra['hamming_1_mean'], step=step)
+    logger.log(key="Hamming 2 (avg)",
+               val=extra['hamming_2_mean'], step=step)
+
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, both right, no comms: {}".format(
+        epoch, step, i_batch, domain, dev_accuracy['total_acc_both_nc'][-1]))
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, both right, after comms: {}".format(
+        epoch, step, i_batch, domain, dev_accuracy['total_acc_both_com'][-1]))
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, at least right, no comms: {}".format(
+        epoch, step, i_batch, domain, dev_accuracy['total_acc_atl1_nc'][-1]))
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, at least 1 right, after comms: {}".format(
+        epoch, step, i_batch, domain, dev_accuracy['total_acc_atl1_com'][-1]))
+
+    flogger.Log("Epoch: {} Step: {} Batch: {} Conversation Length 1 (avg/std): {}/{}".format(epoch,
+                                                                                             step, i_batch, extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std']))
+    flogger.Log("Epoch: {} Step: {} Batch: {} Conversation Length 2 (avg/std): {}/{}".format(epoch,
+                                                                                             step, i_batch, extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
+
+    flogger.Log("Epoch: {} Step: {} Batch: {} Mean Hamming Distance (1/2): {}/{}"
+                .format(epoch, step, i_batch, extra['hamming_1_mean'], extra['hamming_2_mean']))
+    return dev_accuracy_log, total_accuracy_com
+
+
 def corrupt_message(corrupt_region, agent, binary_message):
     # Obtain mask
     mask = Variable(build_mask(corrupt_region, agent.m_dim))
@@ -363,7 +424,8 @@ def exchange(agent1, agent2, exchange_args):
     r_2 = []
 
     # First message (default is 0)
-    m_binary = Variable(torch.FloatTensor(batch_size, agent1.m_dim).fill_(FLAGS.first_msg), volatile=not train)
+    m_binary = Variable(torch.FloatTensor(batch_size, agent1.m_dim).fill_(
+        FLAGS.first_msg), volatile=not train)
     if FLAGS.cuda:
         m_binary = m_binary.cuda()
 
@@ -531,7 +593,8 @@ def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
         (1 - Variable(binary_features.data)) * \
         torch.log(1 - binary_probs + 1e-8)
     log_p_z = log_p_z.sum(1)
-    weight = Variable(rewards) - Variable(baseline_rewards.clone().detach().data)
+    weight = Variable(rewards) - \
+        Variable(baseline_rewards.clone().detach().data)
     # debuglogger.debug(f'Reinforcement weight: {weight.data}')
     if rewards.size(0) > 1:  # Ensures weights are not larger than 1
         weight = weight / np.maximum(1., torch.std(weight.data))
@@ -623,9 +686,11 @@ def bin_to_alpha(binary):
 def calculate_accuracy(prediction_dist, target, batch_size, top_k):
     assert batch_size == target.size(0)
     target_exp = target.view(-1, 1).expand(batch_size, top_k)
-    top_k_ind = torch.from_numpy(prediction_dist.data.cpu().numpy().argsort()[:, -top_k:]).long()
+    top_k_ind = torch.from_numpy(
+        prediction_dist.data.cpu().numpy().argsort()[:, -top_k:]).long()
     correct = (top_k_ind == target_exp.cpu()).sum(dim=1)
-    top_1_ind = torch.from_numpy(prediction_dist.data.cpu().numpy().argsort()[:, -1:]).long()
+    top_1_ind = torch.from_numpy(
+        prediction_dist.data.cpu().numpy().argsort()[:, -1:]).long()
     top_1 = (top_1_ind == target.view(-1, 1).cpu()).sum(dim=1)
     accuracy = correct.sum() / float(batch_size)
     return accuracy, correct, top_1
@@ -809,13 +874,18 @@ def run():
     if FLAGS.eval_only:
         if not os.path.exists(FLAGS.checkpoint):
             raise Exception("Must provide valid checkpoint.")
-        
+
         debuglogger.info("Evaluating on in domain validation set")
-        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(FLAGS.dataset_indomain_valid_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval=True, callback=None)
-        flogger.Log("In domain dev accuracy no comms, both right: " + str(total_accuracy_nc))
-        flogger.Log("In domain dev accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
-        flogger.Log("In domain dev accuracy after comms, both right: " + str(total_accuracy_com))
-        flogger.Log("In domain dev accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
+        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
+            FLAGS.dataset_indomain_valid_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval=True, callback=None)
+        flogger.Log(
+            "In domain dev accuracy no comms, both right: " + str(total_accuracy_nc))
+        flogger.Log(
+            "In domain dev accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
+        flogger.Log(
+            "In domain dev accuracy after comms, both right: " + str(total_accuracy_com))
+        flogger.Log(
+            "In domain dev accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
         with open(FLAGS.id_eval_csv_file, 'w') as f:
             f.write(
                 "checkpoint,eval_file,topk,step,best_dev_acc,eval_acc_nc_2,eval_acc_nc_1,eval_acc_com_2,eval_acc_com_1,convlen_1_mean,convlen_1_std,convlen_2_mean,convlen_2_std\n")
@@ -824,13 +894,18 @@ def run():
                 step, best_dev_acc, total_accuracy_nc, atleast1_accuracy_nc, total_accuracy_com, atleast1_accuracy_com,
                 extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std'],
                 extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
-        
+
         debuglogger.info("Evaluating on out of  domain validation set")
-        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(FLAGS.dataset_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval=False, callback=None)
-        flogger.Log("Out of domain dev accuracy no comms, both right: " + str(total_accuracy_nc))
-        flogger.Log("Out of domain dev accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
-        flogger.Log("Out of domain dev accuracy after comms, both right: " + str(total_accuracy_com))
-        flogger.Log("Out of domain dev accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
+        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
+            FLAGS.dataset_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval=False, callback=None)
+        flogger.Log(
+            "Out of domain dev accuracy no comms, both right: " + str(total_accuracy_nc))
+        flogger.Log(
+            "Out of domain dev accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
+        flogger.Log(
+            "Out of domain dev accuracy after comms, both right: " + str(total_accuracy_com))
+        flogger.Log(
+            "Out of domain dev accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
         with open(FLAGS.ood_eval_csv_file, 'w') as f:
             f.write(
                 "checkpoint,eval_file,topk,step,best_dev_acc,eval_acc_nc_2,eval_acc_nc_1,eval_acc_com_2,eval_acc_com_1,convlen_1_mean,convlen_1_std,convlen_2_mean,convlen_2_std\n")
@@ -858,7 +933,8 @@ def run():
 
         # Read dataset randomly into batches
         if FLAGS.dataset == "shapeworld":
-            dataloader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_mode, FLAGS.dataset_size_train, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size, FLAGS.random_seed, FLAGS.shuffle_train, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
+            dataloader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_mode, FLAGS.dataset_size_train, FLAGS.dataset_type,
+                                                 FLAGS.dataset_name, FLAGS.batch_size, FLAGS.random_seed, FLAGS.shuffle_train, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
         else:
             raise NotImplementedError
 
@@ -875,17 +951,24 @@ def run():
                           'agent1_com': [],  # after communicaton
                           'agent2_com': []  # after communicaton
                           }
-        dev_accuracy = {'total_acc_both_nc': [],  # % both agents right before comms
-                        'total_acc_both_com': [],  # % both agents right after comms
-                        'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
-                        'total_acc_atl1_com': []  # % at least 1 agent right after comms
-                        }
+        dev_accuracy_id = {'total_acc_both_nc': [],  # % both agents right before comms
+                           'total_acc_both_com': [],  # % both agents right after comms
+                           'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                           'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                           }
+
+        dev_accuracy_ood = {'total_acc_both_nc': [],  # % both agents right before comms
+                            'total_acc_both_com': [],  # % both agents right after comms
+                            'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                            'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                            }
 
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
             debuglogger.debug(f'Batch {i_batch}')
 
-            target = batch["target"]  # Converted to Variable in get_classification_loss_and_stats
+            # Converted to Variable in get_classification_loss_and_stats
+            target = batch["target"]
             im_feats_1 = batch["im_feats_1"]  # Already Variable
             im_feats_2 = batch["im_feats_2"]  # Already Variable
             p = batch["p"]
@@ -909,7 +992,8 @@ def run():
             exchange_args["train"] = True
             exchange_args["break_early"] = not FLAGS.fixed_exchange
 
-            s, message_1, message_2, y_all, r = exchange(agent1, agent2, exchange_args)
+            s, message_1, message_2, y_all, r = exchange(
+                agent1, agent2, exchange_args)
 
             s_masks_1, s_feats_1, s_probs_1 = s[0]
             s_masks_2, s_feats_2, s_probs_2 = s[1]
@@ -937,14 +1021,18 @@ def run():
 
             # Obtain predictions, loss and stats agent 1
             # Before communication predictions
-            (dist_1_nc, maxdist_1_nc, argmax_1_nc, ent_1_nc, nll_loss_1_nc, logs_1_nc) = get_classification_loss_and_stats(y_nc[0], target)
+            (dist_1_nc, maxdist_1_nc, argmax_1_nc, ent_1_nc, nll_loss_1_nc,
+             logs_1_nc) = get_classification_loss_and_stats(y_nc[0], target)
             # After communication predictions
-            (dist_2_nc, maxdist_2_nc, argmax_2_nc, ent_2_nc, nll_loss_2_nc, logs_2_nc) = get_classification_loss_and_stats(y_nc[1], target)
+            (dist_2_nc, maxdist_2_nc, argmax_2_nc, ent_2_nc, nll_loss_2_nc,
+             logs_2_nc) = get_classification_loss_and_stats(y_nc[1], target)
             # Obtain predictions, loss and stats agent 1
             # Before communication predictions
-            (dist_1, maxdist_1, argmax_1, ent_1, nll_loss_1_com, logs_1) = get_classification_loss_and_stats(outp_1, target)
+            (dist_1, maxdist_1, argmax_1, ent_1, nll_loss_1_com,
+             logs_1) = get_classification_loss_and_stats(outp_1, target)
             # After communication predictions
-            (dist_2, maxdist_2, argmax_2, ent_2, nll_loss_2_com, logs_2) = get_classification_loss_and_stats(outp_2, target)
+            (dist_2, maxdist_2, argmax_2, ent_2, nll_loss_2_com,
+             logs_2) = get_classification_loss_and_stats(outp_2, target)
 
             # Store prediction entropies
             if FLAGS.fixed_exchange:
@@ -956,25 +1044,36 @@ def run():
                 ent_agent2_y = []
 
             # Calculate accuracy
-            accuracy_1_nc, correct_1_nc, top_1_1_nc = calculate_accuracy(dist_1_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
-            accuracy_1, correct_1, top_1_1 = calculate_accuracy(dist_1, target, FLAGS.batch_size, FLAGS.top_k_train)
-            accuracy_2_nc, correct_2_nc, top_1_2_nc = calculate_accuracy(dist_2_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
-            accuracy_2, correct_2, top_1_2 = calculate_accuracy(dist_2, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_1_nc, correct_1_nc, top_1_1_nc = calculate_accuracy(
+                dist_1_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_1, correct_1, top_1_1 = calculate_accuracy(
+                dist_1, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_2_nc, correct_2_nc, top_1_2_nc = calculate_accuracy(
+                dist_2_nc, target, FLAGS.batch_size, FLAGS.top_k_train)
+            accuracy_2, correct_2, top_1_2 = calculate_accuracy(
+                dist_2, target, FLAGS.batch_size, FLAGS.top_k_train)
 
             # Calculate rewards
             total_correct_nc = correct_1_nc.float() + correct_2_nc.float()
             total_correct_com = correct_1.float() + correct_2.float()
-            total_accuracy_nc = (total_correct_nc == 2).sum() / float(FLAGS.batch_size)
-            total_accuracy_com = (total_correct_com == 2).sum() / float(FLAGS.batch_size)
-            atleast1_accuracy_nc = (total_correct_nc > 0).sum() / float(FLAGS.batch_size)
-            atleast1_accuracy_com = (total_correct_com > 0).sum() / float(FLAGS.batch_size)
+            total_accuracy_nc = (total_correct_nc ==
+                                 2).sum() / float(FLAGS.batch_size)
+            total_accuracy_com = (total_correct_com ==
+                                  2).sum() / float(FLAGS.batch_size)
+            atleast1_accuracy_nc = (
+                total_correct_nc > 0).sum() / float(FLAGS.batch_size)
+            atleast1_accuracy_com = (
+                total_correct_com > 0).sum() / float(FLAGS.batch_size)
             # rewards = difference between performance before and after communication
             # Only use top 1
             total_correct_top_1_nc = top_1_1_nc.float() + top_1_2_nc.float()
             total_correct_top_1_com = top_1_1.float() + top_1_2.float()
-            rewards = (total_correct_top_1_com.float() - total_correct_top_1_nc.float())
-            debuglogger.debug(f'total correct top 1 com: {total_correct_top_1_com}')
-            debuglogger.debug(f'total correct top 1 nc: {total_correct_top_1_nc}')
+            rewards = (total_correct_top_1_com.float() -
+                       total_correct_top_1_nc.float())
+            debuglogger.debug(
+                f'total correct top 1 com: {total_correct_top_1_com}')
+            debuglogger.debug(
+                f'total correct top 1 nc: {total_correct_top_1_nc}')
             debuglogger.debug(f'total correct com: {total_correct_com}')
             debuglogger.debug(f'total correct nc: {total_correct_nc}')
             debuglogger.debug(f'rewards: {rewards}')
@@ -993,8 +1092,10 @@ def run():
             batch_accuracy['total_acc_atl1_com'].append(atleast1_accuracy_com)
 
             # Cross entropy loss for each agent
-            nll_loss_1 = FLAGS.nll_loss_weight_nc * nll_loss_1_nc + FLAGS.nll_loss_weight_com * nll_loss_1_com
-            nll_loss_2 = FLAGS.nll_loss_weight_nc * nll_loss_2_nc + FLAGS.nll_loss_weight_com * nll_loss_2_com
+            nll_loss_1 = FLAGS.nll_loss_weight_nc * nll_loss_1_nc + \
+                FLAGS.nll_loss_weight_com * nll_loss_1_com
+            nll_loss_2 = FLAGS.nll_loss_weight_nc * nll_loss_2_nc + \
+                FLAGS.nll_loss_weight_com * nll_loss_2_com
             loss_agent1 = nll_loss_1
             loss_agent2 = nll_loss_2
 
@@ -1005,11 +1106,14 @@ def run():
                     # Stop loss
                     # TODO - check old use of entropy_s
                     # The receiver might have no z-loss if we stop after first message from sender.
-                    debuglogger.warning(f'Error: multistep fixed exchange not implemented yet')
+                    debuglogger.warning(
+                        f'Error: multistep fixed exchange not implemented yet')
                     sys.exit()
                 elif FLAGS.max_exchange == 1:
-                    loss_binary_1, ent_bin_1 = calculate_loss_binary(feats_1[0], probs_1[0], rewards, r[0][0], FLAGS.entropy_agent1)
-                    loss_binary_2, ent_bin_2 = calculate_loss_binary(feats_2[0], probs_2[0], rewards, r[1][0], FLAGS.entropy_agent2)
+                    loss_binary_1, ent_bin_1 = calculate_loss_binary(
+                        feats_1[0], probs_1[0], rewards, r[0][0], FLAGS.entropy_agent1)
+                    loss_binary_2, ent_bin_2 = calculate_loss_binary(
+                        feats_2[0], probs_2[0], rewards, r[1][0], FLAGS.entropy_agent2)
                     loss_baseline_1 = calculate_loss_bas(r[0][0], rewards)
                     loss_baseline_2 = calculate_loss_bas(r[1][0], rewards)
                     ent_agent1_bin = [ent_bin_1]
@@ -1018,7 +1122,8 @@ def run():
                     # TODO
                     ent_agent1_bin = []
                     ent_agent2_bin = []
-                    debuglogger.warning(f'Error: multistep fixed exchange not implemented yet')
+                    debuglogger.warning(
+                        f'Error: multistep fixed exchange not implemented yet')
                     sys.exit()
 
             if FLAGS.use_binary:
@@ -1059,7 +1164,8 @@ def run():
                     batch_accuracy['total_acc_atl1_com'][-FLAGS.log_interval:]).mean()
 
                 # Log accuracy
-                log_acc = "Epoch: {} Step: {} Batch: {} Training Accuracy:\nBefore comms: Both correct: {} At least 1 correct: {}\nAfter comms: Both correct: {} At least 1 correct: {}".format(epoch, step, i_batch, avg_batch_acc_total_nc, avg_batch_acc_atl1_nc, avg_batch_acc_total_com, avg_batch_acc_atl1_com)
+                log_acc = "Epoch: {} Step: {} Batch: {} Training Accuracy:\nBefore comms: Both correct: {} At least 1 correct: {}\nAfter comms: Both correct: {} At least 1 correct: {}".format(
+                    epoch, step, i_batch, avg_batch_acc_total_nc, avg_batch_acc_atl1_nc, avg_batch_acc_total_com, avg_batch_acc_atl1_com)
                 flogger.Log(log_acc)
 
                 # Agent1
@@ -1105,7 +1211,8 @@ def run():
 
                 if len(ent_agent1_y) > 0:
                     log_ent_agent1_y = "Entropy Agent1 Predictions\n"
-                    log_ent_agent1_y += "No comms entropy {}\n Comms entropy\n".format(-ent_1_nc.data[0])
+                    log_ent_agent1_y += "No comms entropy {}\n Comms entropy\n".format(
+                        -ent_1_nc.data[0])
                     for i, ent in enumerate(ent_agent1_y):
                         log_ent_agent1_y += "\n{}. {}".format(i, -ent.data[0])
                     log_ent_agent1_y += "\n"
@@ -1113,7 +1220,8 @@ def run():
 
                 if len(ent_agent2_y) > 0:
                     log_ent_agent2_y = "Entropy Agent2 Predictions\n"
-                    log_ent_agent2_y += "No comms entropy {}\n Comms entropy\n".format(-ent_2_nc.data[0])
+                    log_ent_agent2_y += "No comms entropy {}\n Comms entropy\n".format(
+                        -ent_2_nc.data[0])
                     for i, ent in enumerate(ent_agent2_y):
                         log_ent_agent2_y += "\n{}. {}".format(i, -ent.data[0])
                     log_ent_agent2_y += "\n"
@@ -1123,13 +1231,16 @@ def run():
                 # most recent exchange.
                 if FLAGS.exchange_samples > 0:
 
-                    log_train = log_exchange(s, message_1, message_2, current_exchange, log_type="Train:")
+                    log_train = log_exchange(
+                        s, message_1, message_2, current_exchange, log_type="Train:")
                     flogger.Log(log_train)
 
                     exchange_args["train"] = False
-                    s, message_1, message_2, y_all, r = exchange(agent1, agent2, exchange_args)
+                    s, message_1, message_2, y_all, r = exchange(
+                        agent1, agent2, exchange_args)
 
-                    log_train = log_exchange(s, message_1, message_2, current_exchange, log_type="Eval:")
+                    log_train = log_exchange(
+                        s, message_1, message_2, current_exchange, log_type="Eval:")
                     flogger.Log(log_train)
 
                 # Agent 1
@@ -1180,45 +1291,20 @@ def run():
 
             # Report development accuracy
             if step % FLAGS.log_dev == 0:
-                total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(FLAGS.top_k_dev, agent1, agent2, callback=None)
-                dev_accuracy['total_acc_both_nc'].append(total_accuracy_nc)
-                dev_accuracy['total_acc_both_com'].append(total_accuracy_com)
-                dev_accuracy['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
-                dev_accuracy['total_acc_atl1_com'].append(atleast1_accuracy_com)
-                logger.log(key="Development Accuracy, both right, no comms", val=dev_accuracy['total_acc_both_nc'][-1], step=step)
-                logger.log(key="Development Accuracy, both right, after comms", val=dev_accuracy['total_acc_both_com'][-1], step=step)
-                logger.log(key="Development Accuracy, at least 1 right, no comms", val=dev_accuracy['total_acc_atl1_nc'][-1], step=step)
-                logger.log(key="Development Accuracy, at least 1 right, after comms", val=dev_accuracy['total_acc_atl1_com'][-1], step=step)
-                logger.log(key="Conversation Length A1 (avg)",
-                           val=extra['conversation_lengths_1_mean'], step=step)
-                logger.log(key="Conversation Length A1 (std)",
-                           val=extra['conversation_lengths_1_std'], step=step)
-                logger.log(key="Conversation Length A2 (avg)",
-                           val=extra['conversation_lengths_2_mean'], step=step)
-                logger.log(key="Conversation Length A2 (std)",
-                           val=extra['conversation_lengths_2_std'], step=step)
-                logger.log(key="Hamming 1 (avg)",
-                           val=extra['hamming_1_mean'], step=step)
-                logger.log(key="Hamming 2 (avg)",
-                           val=extra['hamming_2_mean'], step=step)
-
-                flogger.Log("Epoch: {} Step: {} Batch: {} Development Accuracy, both right, no comms: {}".format(epoch, step, i_batch, dev_accuracy['total_acc_both_nc'][-1]))
-                flogger.Log("Epoch: {} Step: {} Batch: {} Development Accuracy, both right, after comms: {}".format(epoch, step, i_batch, dev_accuracy['total_acc_both_com'][-1]))
-                flogger.Log("Epoch: {} Step: {} Batch: {} Development Accuracy, at least right, no comms: {}".format(epoch, step, i_batch, dev_accuracy['total_acc_atl1_nc'][-1]))
-                flogger.Log("Epoch: {} Step: {} Batch: {} Development Accuracy, at least 1 right, after comms: {}".format(epoch, step, i_batch, dev_accuracy['total_acc_atl1_com'][-1]))
-
-                flogger.Log("Epoch: {} Step: {} Batch: {} Conversation Length 1 (avg/std): {}/{}".format(epoch, step, i_batch, extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std']))
-                flogger.Log("Epoch: {} Step: {} Batch: {} Conversation Length 2 (avg/std): {}/{}".format(epoch, step, i_batch, extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
-
-                flogger.Log("Epoch: {} Step: {} Batch: {} Mean Hamming Distance (1/2): {}/{}"
-                            .format(epoch, step, i_batch, extra['hamming_1_mean'], extra['hamming_2_mean']))
+                # Report in domaind development accuracy and checkpoint if best result
+                dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain")
                 if step >= FLAGS.save_after and total_accuracy_com > best_dev_acc:
                     best_dev_acc = total_accuracy_com
                     flogger.Log(
-                        "Checkpointing with best Development Accuracy (both right after comms): {}".format(best_dev_acc))
+                        "Checkpointing with best In Domain Development Accuracy (both right after comms): {}".format(best_dev_acc))
                     # Optionally store additional information
                     data = dict(step=step, best_dev_acc=best_dev_acc)
-                    torch_save(FLAGS.checkpoint + "_best", data, models_dict, optimizers_dict, gpu=0 if FLAGS.cuda else -1)
+                    torch_save(FLAGS.checkpoint + "_best", data, models_dict,
+                               optimizers_dict, gpu=0 if FLAGS.cuda else -1)
+                # Report out of domain development accuracy
+                dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "In Domain")
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:
@@ -1291,19 +1377,23 @@ def flags():
     gflags.DEFINE_string("debug_log_level", 'INFO', "")
 
     # Convenience settings
-    gflags.DEFINE_integer("save_after", 1000, "Min step (num batches) after which to save")
-    gflags.DEFINE_integer("save_interval", 100, "How often to save after min batches have been reached")
+    gflags.DEFINE_integer("save_after", 1000,
+                          "Min step (num batches) after which to save")
+    gflags.DEFINE_integer(
+        "save_interval", 100, "How often to save after min batches have been reached")
     gflags.DEFINE_string("checkpoint", None, "Path to save data")
     gflags.DEFINE_string("conf_mat", None, "Path to save confusion matrix")
     gflags.DEFINE_string("log_path", "./logs", "Path to save logs")
     gflags.DEFINE_string("log_file", None, "")
     gflags.DEFINE_string("eval_csv_file", None, "Path to eval log file")
-    gflags.DEFINE_string("json_file", None, "Where to store all flags for an experiment")
+    gflags.DEFINE_string(
+        "json_file", None, "Where to store all flags for an experiment")
     gflags.DEFINE_string("log_load", None, "")
     gflags.DEFINE_boolean("eval_only", False, "")
 
     # Extract Settings
-    gflags.DEFINE_boolean("binary_only", False, "Only extract binary data (no training)")
+    gflags.DEFINE_boolean("binary_only", False,
+                          "Only extract binary data (no training)")
     gflags.DEFINE_string("binary_output", None, "Where to store binary data")
 
     # Performance settings
@@ -1319,20 +1409,26 @@ def flags():
 
     # Data settings
     gflags.DEFINE_integer("wv_dim", 100, "Dimension of the word vectors")
-    gflags.DEFINE_string("dataset", "shapeworld", "What type of dataset to use")
-    gflags.DEFINE_string("dataset_path", "./Shapeworld/data/oneshape_simple_textselect", "Root directory of the dataset")
+    gflags.DEFINE_string("dataset", "shapeworld",
+                         "What type of dataset to use")
+    gflags.DEFINE_string(
+        "dataset_path", "./Shapeworld/data/oneshape_simple_textselect", "Root directory of the dataset")
     gflags.DEFINE_string("dataset_mode", "train", "")
-    gflags.DEFINE_enum("dataset_eval_mode", "validation", ["validation", "test"], "")
+    gflags.DEFINE_enum("dataset_eval_mode", "validation",
+                       ["validation", "test"], "")
     gflags.DEFINE_string("dataset_type", "agreement", "Task type")
-    gflags.DEFINE_string("dataset_name", "oneshape_simple_textselect", "Name of dataset (should correspond to the root directory name automatically generated using ShapeWorld generate.py)")
-    gflags.DEFINE_integer("dataset_size_train", 100, "How many examples to use")
+    gflags.DEFINE_string("dataset_name", "oneshape_simple_textselect",
+                         "Name of dataset (should correspond to the root directory name automatically generated using ShapeWorld generate.py)")
+    gflags.DEFINE_integer("dataset_size_train", 100,
+                          "How many examples to use")
     gflags.DEFINE_integer("dataset_size_dev", 100, "How many examples to use")
     gflags.DEFINE_string(
         "glove_path", "./glove.6B/glove.6B.100d.txt", "")
     gflags.DEFINE_boolean("shuffle_train", True, "")
     gflags.DEFINE_boolean("shuffle_dev", False, "")
     gflags.DEFINE_integer("random_seed", 7, "")
-    gflags.DEFINE_enum("resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")
+    gflags.DEFINE_enum(
+        "resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")
 
     # Model settings
     gflags.DEFINE_enum("model_type", None, [
@@ -1342,11 +1438,15 @@ def flags():
     gflags.DEFINE_enum("data_context", "fc", [
                        "fc"], "Specify which layer output to use as context for attention")
     # gflags.DEFINE_enum("sender_mix", "sum", ["sum", "prod", "mou"], "")
-    gflags.DEFINE_integer("img_feat_dim", 512, "Dimension of the image features")
-    gflags.DEFINE_integer("h_dim", 100, "Hidden dimension for all hidden representations in the network")
+    gflags.DEFINE_integer("img_feat_dim", 512,
+                          "Dimension of the image features")
+    gflags.DEFINE_integer(
+        "h_dim", 100, "Hidden dimension for all hidden representations in the network")
     gflags.DEFINE_integer("m_dim", 64, "Dimension of the messages")
-    gflags.DEFINE_integer("desc_dim", 100, "Dimension of the input description vectors")
-    gflags.DEFINE_integer("num_classes", 10, "How many texts the agents have to choose from")
+    gflags.DEFINE_integer(
+        "desc_dim", 100, "Dimension of the input description vectors")
+    gflags.DEFINE_integer(
+        "num_classes", 10, "How many texts the agents have to choose from")
     gflags.DEFINE_integer("s_dim", 1, "Stop probability output dim")
     gflags.DEFINE_boolean("use_binary", True,
                           "Encoding whether agents uses binary features")
@@ -1361,7 +1461,8 @@ def flags():
     # gflags.DEFINE_boolean("flipout_dev", False, "Dropout for bit flipping")
     # gflags.DEFINE_boolean("s_prob_prod", True, "Simulate sampling during test time")
     gflags.DEFINE_boolean("visual_attn", False, "agents attends over image")
-    gflags.DEFINE_boolean("use_MLP", False, "use MLP to generate prediction scores")
+    gflags.DEFINE_boolean(
+        "use_MLP", False, "use MLP to generate prediction scores")
     gflags.DEFINE_integer("attn_dim", 256, "")
     gflags.DEFINE_boolean("attn_extra_context", False, "")
     gflags.DEFINE_integer("attn_context_dim", 4096, "")

@@ -1455,7 +1455,7 @@ def flags():
     gflags.DEFINE_string(
         "glove_path", "./glove.6B/glove.6B.100d.txt", "")
     gflags.DEFINE_boolean("shuffle_train", True, "")
-    gflags.DEFINE_boolean("shuffle_dev", False, "")
+    gflags.DEFINE_boolean("shuffle_dev", True, "")
     gflags.DEFINE_integer("random_seed", 7, "")
     gflags.DEFINE_enum(
         "resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")

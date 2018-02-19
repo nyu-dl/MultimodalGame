@@ -25,6 +25,9 @@ logging.basicConfig(format=FORMAT)
 debuglogger = logging.getLogger('main_logger')
 debuglogger.setLevel('DEBUG')
 
+SHAPES = ['circle', 'cross', 'ellipse', 'pentagon', 'rectangle', 'semicircle', 'square', 'triangle']
+COLORS = ['blue', 'cyan', 'gray', 'green', 'magenta', 'red', 'yellow']
+
 
 def clean_and_tokenize(desc):
     words = word_tokenize(desc.lower())  # lowercase and tokenize
@@ -168,7 +171,25 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         # Extract target and texts
         batch['target'] = torch.from_numpy(generated['target'][batch_indices]).long()
         batch["texts_str"] = [generated['texts_str'][j] for j in batch_indices]
+        batch["caption_str"] = [generated['caption_str'][j] for j in batch_indices]
         batch["texts_int"] = [texts_int[j] for j in batch_indices]
+
+        # Get shape and color for batch
+        batch["shapes"] = []
+        batch["colors"] = []
+        for cap in batch["caption_str"]:
+            cap = cap.split()
+            color = None
+            shape = None
+            for w in cap:
+                if w in SHAPES:
+                    shape = w
+                if w in COLORS:
+                    color = w
+            batch["shapes"].append(shape)
+            batch["colors"].append(color)
+        assert len(batch["shapes"]) == batch_size
+        assert len(batch["colors"]) == batch_size
 
         # Generate p
         batch['p'] = torch.from_numpy(np.random.rand(batch_size))

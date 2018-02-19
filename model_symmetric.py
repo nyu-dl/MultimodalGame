@@ -70,7 +70,7 @@ def loglikelihood(log_prob, target):
     return log_prob.gather(1, target)
 
 
-def eval_dev(top_k, agent1, agent2, callback=None):
+def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=None):
     """
     Function computing development accuracy
     """
@@ -100,7 +100,13 @@ def eval_dev(top_k, agent1, agent2, callback=None):
     atleast1_correct_com = 0
 
     # Load development images
-    dev_loader = load_shapeworld_dataset(FLAGS.dataset_path, FLAGS.glove_path, FLAGS.dataset_eval_mode, FLAGS.dataset_size_dev, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
+    if in_domain_eval:
+        eval_mode = "train"
+        debuglogger.info("Evaluating on in domain validation set")
+    else:
+        eval_mode = FLAGS.dataset_eval_mode
+        debuglogger.info("Evaluating on out of domain validation set")
+    dev_loader = load_shapeworld_dataset(dataset_path, FLAGS.glove_path, eval_mode, FLAGS.dataset_size_dev, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
 
     for batch in dev_loader:
         target = batch["target"]
@@ -803,16 +809,33 @@ def run():
     if FLAGS.eval_only:
         if not os.path.exists(FLAGS.checkpoint):
             raise Exception("Must provide valid checkpoint.")
-        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(FLAGS.top_k_dev, agent1, agent2, callback=None)
-        flogger.Log("Dev Accuracy no comms, both right: " + str(total_accuracy_nc))
-        flogger.Log("Dev Accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
-        flogger.Log("Dev Accuracy after comms, both right: " + str(total_accuracy_com))
-        flogger.Log("Dev Accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
-        with open(FLAGS.eval_csv_file, 'w') as f:
+        
+        debuglogger.info("Evaluating on in domain validation set")
+        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(FLAGS.dataset_indomain_valid_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval=True, callback=None)
+        flogger.Log("In domain dev accuracy no comms, both right: " + str(total_accuracy_nc))
+        flogger.Log("In domain dev accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
+        flogger.Log("In domain dev accuracy after comms, both right: " + str(total_accuracy_com))
+        flogger.Log("In domain dev accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
+        with open(FLAGS.id_eval_csv_file, 'w') as f:
             f.write(
                 "checkpoint,eval_file,topk,step,best_dev_acc,eval_acc_nc_2,eval_acc_nc_1,eval_acc_com_2,eval_acc_com_1,convlen_1_mean,convlen_1_std,convlen_2_mean,convlen_2_std\n")
             f.write("{},{},{},{},{},{},{},{}\n".format(
-                FLAGS.checkpoint, FLAGS.dev_file, FLAGS.top_k_dev,
+                FLAGS.checkpoint, FLAGS.dataset_indomain_valid_path, FLAGS.top_k_dev,
+                step, best_dev_acc, total_accuracy_nc, atleast1_accuracy_nc, total_accuracy_com, atleast1_accuracy_com,
+                extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std'],
+                extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
+        
+        debuglogger.info("Evaluating on out of  domain validation set")
+        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(FLAGS.dataset_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval=False, callback=None)
+        flogger.Log("Out of domain dev accuracy no comms, both right: " + str(total_accuracy_nc))
+        flogger.Log("Out of domain dev accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
+        flogger.Log("Out of domain dev accuracy after comms, both right: " + str(total_accuracy_com))
+        flogger.Log("Out of domain dev accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
+        with open(FLAGS.ood_eval_csv_file, 'w') as f:
+            f.write(
+                "checkpoint,eval_file,topk,step,best_dev_acc,eval_acc_nc_2,eval_acc_nc_1,eval_acc_com_2,eval_acc_com_1,convlen_1_mean,convlen_1_std,convlen_2_mean,convlen_2_std\n")
+            f.write("{},{},{},{},{},{},{},{}\n".format(
+                FLAGS.checkpoint, FLAGS.dataset_path, FLAGS.top_k_dev,
                 step, best_dev_acc, total_accuracy_nc, atleast1_accuracy_nc, total_accuracy_com, atleast1_accuracy_com,
                 extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std'],
                 extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))

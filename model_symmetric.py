@@ -1328,7 +1328,7 @@ def run():
             debuglogger.debug(f'total correct nc: {total_correct_nc}')
             debuglogger.debug(f'rewards_1: {rewards_1}')
             debuglogger.debug(f'rewards_2: {rewards_2}')
-
+            sys.exit()
             # Store results
             batch_accuracy['agent1_nc'].append(accuracy_1_nc)
             batch_accuracy['agent2_nc'].append(accuracy_2_nc)
@@ -1713,9 +1713,9 @@ def flags():
     gflags.DEFINE_integer("s_dim", 1, "Stop probability output dim")
     gflags.DEFINE_boolean("use_binary", True,
                           "Encoding whether agents uses binary features")
-    gflags.DEFINE_boolean("randomize_comms", True,
+    gflags.DEFINE_boolean("randomize_comms", False,
                           "Whether to randomize the order in which agents communicate")
-    gflags.DEFINE_boolean("cooperative_reward", True,
+    gflags.DEFINE_boolean("cooperative_reward", False,
                           "Whether to have a cooperative or individual reward structure")
     # gflags.DEFINE_boolean("ignore_2", False,
     #                       "Agent 1 ignores messages from Agent 2")

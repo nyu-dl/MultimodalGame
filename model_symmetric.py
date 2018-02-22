@@ -596,16 +596,22 @@ def exchange(a1, a2, exchange_args):
 
     # Randomly select which agent goes first
     who_goes_first = None
-    if random.random() < 0.5:
+    if FLAGS.randomize_comms:
+        if random.random() < 0.5:
+            agent1 = a1
+            agent2 = a2
+            who_goes_first = 1
+            debuglogger.debug(f'Agent 1 communicates first')
+        else:
+            agent1 = a2
+            agent2 = a1
+            who_goes_first = 2
+            debuglogger.debug(f'Agent 2 communicates first')
+    else:
         agent1 = a1
         agent2 = a2
         who_goes_first = 1
         debuglogger.debug(f'Agent 1 communicates first')
-    else:
-        agent1 = a2
-        agent2 = a1
-        who_goes_first = 2
-        debuglogger.debug(f'Agent 2 communicates first')
 
     data = exchange_args["data"]
     # TODO extend implementation to include data context
@@ -1691,10 +1697,12 @@ def flags():
     gflags.DEFINE_integer("s_dim", 1, "Stop probability output dim")
     gflags.DEFINE_boolean("use_binary", True,
                           "Encoding whether agents uses binary features")
-    gflags.DEFINE_boolean("ignore_2", False,
-                          "Agent 1 ignores messages from Agent 2")
-    gflags.DEFINE_boolean("ignore_1", False,
-                          "Agent 2 ignores messages from Agent 1")
+    gflags.DEFINE_boolean("randomize_comms", True,
+                          "Whether to randomize the order in which agents communicate")
+    # gflags.DEFINE_boolean("ignore_2", False,
+    #                       "Agent 1 ignores messages from Agent 2")
+    # gflags.DEFINE_boolean("ignore_1", False,
+    #                       "Agent 2 ignores messages from Agent 1")
     # gflags.DEFINE_boolean("block_y", True, "Halt gradient flow through description scores")
     gflags.DEFINE_float("first_msg", 0, "Value to fill the first message with")
     # gflags.DEFINE_float("flipout_1", None, "Dropout for bit flipping")

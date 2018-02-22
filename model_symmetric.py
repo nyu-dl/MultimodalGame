@@ -73,26 +73,139 @@ def loglikelihood(log_prob, target):
     return log_prob.gather(1, target)
 
 
-def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=None):
+def store_exemplar_batch(data, data_type, logger, flogger):
+    '''Writes 100 examples in the data to file for debugging
+
+    data: dictionary containing data and results
+        data = {"masked_im_1": [],
+                "masked_im_2": [],
+                "msg_1": [],
+                "msg_2": [],
+                "p": [],
+                "target": [],
+                "caption": [],
+                "shapes": [],
+                "colors": [],
+                "texts": [],
+                }
+    data_type: flag giving the name of the data to be stored.
+               e.g. "correct", "incorrect"
+    '''
+    # TODO
+    pass
+
+
+def calc_message_mean_and_std(m_store):
+    # TODO comments and check
+    for k in m_store:
+        msgs = m_store[k]["message"]
+        msgs = torch.cat(msgs, dim=0)
+        debuglogger.debug(f'Count: {m_store[k]["count"]}, Messages: {msgs.size()}')
+        mean = torch.mean(msgs, dim=0)
+        std = torch.std(msgs, dim=0)
+        m_store[k]["mean"] = mean
+        m_store[k]["std"] = std
+    return m_store
+
+
+def log_message_stats(m_store, logger, flogger):
+    # TODO
+    pass
+
+
+def analyze_messages(messages, shapes, colors, data_type, logger, flogger):
+    '''Prints the mean and std deviation per set of messages per shape, per color and per shape-color for each message set
+
+    messages: list of lists of messages. Each list contains the messages sent for an agent
+    shapes: list of shapes contained in the images (subjects of the message)
+    colors: list of colors contained in the image (subjects of the message)
+    data_type: flag explaining the type of data
+               e.g. "correct", "incorrect"
+
+    Each message list should have the same length and the shape and colors lists
+    '''
+    # TODO - check
+    for m_set in messages:
+        assert len(m_set) == len(shapes)
+        assert len(m_set) == len(colors)
+
+    for i, m_set in enumerate(messages):
+        s_store = {}
+        c_store = {}
+        s_c_store = {}
+        # Collect all messages
+        for m, s, c in zip(m_set, shapes, colors):
+            if s in s_store:
+                s_store[s]["count"] += 1
+                s_store[s]["message"].append(m)
+            else:
+                s_store[s]["count"] = 0
+                s_store[s]["message"] = [m]
+            if c in c_store:
+                c_store[c]["count"] += 1
+                c_store[c]["message"].append(m)
+            else:
+                c_store[c]["count"] = 0
+                c_store[c]["message"] = [m]
+            s_c = str(s) + "_" + str(c)
+            if s_c in s_c_store:
+                s_c_store[s_c]["count"] += 1
+                s_c_store[s_c]["message"].append(m)
+            else:
+                s_c_store[s_c]["count"] = 0
+                s_c_store[s_c]["message"] = [m]
+        # Calculate and log mean and std_dev
+        s_store = calc_message_mean_and_std(s_store)
+        log_message_stats(s_store, logger, flogger)
+        c_store = calc_message_mean_and_std(c_store)
+        log_message_stats(c_store, logger, flogger)
+        s_c_store = calc_message_mean_and_std(s_c_store)
+        log_message_stats(s_c_store, logger, flogger)
+
+
+def add_data_point(batch, i, data_store, messages_1, messages_2):
+    '''Adds the relevant data from a batch to a data store to analyze later'''
+    data_store["masked_im_1"].append(batch["masked_im_1"][i])
+    data_store["masked_im_2"].append(batch["masked_im_2"][i])
+    data_store["p"].append(batch["p"][i])
+    data_store["msg_1"].append(batch["msg_1"][i])
+    data_store["msg_2"].append(batch["msg_2"][i])
+    data_store["target"].append(batch["target"][i])
+    data_store["caption"].append(batch["caption"][i])
+    data_store["shapes"].append(batch["shapes"][i])
+    data_store["colors"].append(batch["colors"][i])
+    data_store["texts"].append(batch["texts"][i])
+    return data_store
+
+
+def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eval=True, callback=None):
     """
     Function computing development accuracy
     """
 
     extra = dict()
-    correct_to_save = {"masked_im_1": [],
-                       "masked_im_2": [],
-                       "p": [],
-                       "target": [],
-                       "caption": [],
-                       "texts": []
-                       }
-    incorrect_to_save = {"masked_im_1": [],
-                         "masked_im_2": [],
-                         "p": [],
-                         "target": [],
-                         "caption": [],
-                         "texts": []
-                         }
+    correct_to_analyze = {"masked_im_1": [],
+                          "masked_im_2": [],
+                          "msg_1": [],
+                          "msg_2": [],
+                          "p": [],
+                          "target": [],
+                          "caption": [],
+                          "shapes": [],
+                          "colors": [],
+                          "texts": [],
+                          }
+    incorrect_to_analyze = {"masked_im_1": [],
+                            "masked_im_2": [],
+                            "msg_1": [],
+                            "msg_2": [],
+                            "p": [],
+                            "target": [],
+                            "caption": [],
+                            "shapes": [],
+                            "colors": [],
+                            "texts": [],
+                            }
 
     # Keep track of shapes and color accuracy
     shapes_accuracy = {}
@@ -337,6 +450,11 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
                 colors_accuracy[color]["total"] += 1
                 if correct_indices_com[_i]:
                     colors_accuracy[color]["correct"] += 1
+            # Store batch data to analyze
+            if correct_indices_com[_i]:
+                correct_to_analyze = add_data_point(batch, _i, correct_to_analyze, feats_1, feats_2)
+            else:
+                incorrect_to_analyze = add_data_point(batch, _i, incorrect_to_analyze, feats_1, feats_2)
 
         # debuglogger.debug(f'shapes dict: {shapes_accuracy}')
         # debuglogger.debug(f'colors dict: {colors_accuracy}')
@@ -369,6 +487,11 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
 
         hamming_1.append(mean_hamming_1)
         hamming_2.append(mean_hamming_2)
+
+        store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
+        store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger)
+        analyze_messages(correct_to_analyze, "correct", logger, flogger)
+        analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger)
 
         if callback is not None:
             callback_dict = dict(
@@ -431,7 +554,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, in_domain_eval=True, callback=
 
 def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch):
     total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
-        dataset_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval, callback=None)
+        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, in_domain_eval, callback=None)
     dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
     dev_accuracy_log['total_acc_both_com'].append(total_accuracy_com)
     dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)

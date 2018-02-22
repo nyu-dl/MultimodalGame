@@ -1328,7 +1328,6 @@ def run():
             debuglogger.debug(f'total correct nc: {total_correct_nc}')
             debuglogger.debug(f'rewards_1: {rewards_1}')
             debuglogger.debug(f'rewards_2: {rewards_2}')
-            sys.exit()
             # Store results
             batch_accuracy['agent1_nc'].append(accuracy_1_nc)
             batch_accuracy['agent2_nc'].append(accuracy_2_nc)

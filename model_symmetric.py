@@ -1535,7 +1535,7 @@ def run():
 
             # Report development accuracy
             if step % FLAGS.log_dev == 0:
-                # Report in domaind development accuracy and checkpoint if best result
+                # Report in domain development accuracy and checkpoint if best result
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
                     agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch)
                 if step >= FLAGS.save_after and total_accuracy_com > best_dev_acc:
@@ -1549,6 +1549,13 @@ def run():
                 # Report out of domain development accuracy
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
                     agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch)
+
+            # Report in domain development accuracy when agents communicate with themselves
+            if step % FLAGS.log_self_com == 0:
+                dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                    agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch)
+                dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                    agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch)
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:
@@ -1651,6 +1658,7 @@ def flags():
     gflags.DEFINE_string("experiment_name", None, "")
     gflags.DEFINE_integer("log_interval", 50, "")
     gflags.DEFINE_integer("log_dev", 1000, "")
+    gflags.DEFINE_integer("log_self_com", 10000, "")
 
     # Data settings
     gflags.DEFINE_integer("wv_dim", 100, "Dimension of the word vectors")

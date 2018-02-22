@@ -1185,7 +1185,8 @@ def run():
         # Keep track of metrics
         batch_accuracy = {'total_nc': [],  # no communicaton
                           'total_com': [],  # after communication
-                          'rewards': [],  # total_com - total_nc
+                          'rewards_1': [],  # agent 1 rewards
+                          'rewards_2': [],  # agent 2 rewards
                           'total_acc_both_nc': [],  # % both agents right before comms
                           'total_acc_both_com': [],  # % both agents right after comms
                           'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
@@ -1297,7 +1298,7 @@ def run():
             accuracy_2, correct_2, top_1_2 = calculate_accuracy(
                 dist_2, target, FLAGS.batch_size, FLAGS.top_k_train)
 
-            # Calculate rewards
+            # Calculate accuracy
             total_correct_nc = correct_1_nc.float() + correct_2_nc.float()
             total_correct_com = correct_1.float() + correct_2.float()
             total_accuracy_nc = (total_correct_nc ==
@@ -1308,19 +1309,25 @@ def run():
                 total_correct_nc > 0).sum() / float(FLAGS.batch_size)
             atleast1_accuracy_com = (
                 total_correct_com > 0).sum() / float(FLAGS.batch_size)
+            # Calculate rewards
             # rewards = difference between performance before and after communication
             # Only use top 1
             total_correct_top_1_nc = top_1_1_nc.float() + top_1_2_nc.float()
             total_correct_top_1_com = top_1_1.float() + top_1_2.float()
-            rewards = (total_correct_top_1_com.float() -
-                       total_correct_top_1_nc.float())
+            if FLAGS.cooperative_reward:
+                rewards_1 = (total_correct_top_1_com.float() - total_correct_top_1_nc.float())
+                rewards_2 = rewards_1
+            else:
+                rewards_1 = top_1_1.float()
+                rewards_2 = top_1_2.float()
             debuglogger.debug(
                 f'total correct top 1 com: {total_correct_top_1_com}')
             debuglogger.debug(
                 f'total correct top 1 nc: {total_correct_top_1_nc}')
             debuglogger.debug(f'total correct com: {total_correct_com}')
             debuglogger.debug(f'total correct nc: {total_correct_nc}')
-            debuglogger.debug(f'rewards: {rewards}')
+            debuglogger.debug(f'rewards_1: {rewards_1}')
+            debuglogger.debug(f'rewards_2: {rewards_2}')
 
             # Store results
             batch_accuracy['agent1_nc'].append(accuracy_1_nc)
@@ -1329,7 +1336,8 @@ def run():
             batch_accuracy['agent2_com'].append(accuracy_2)
             batch_accuracy['total_nc'].append(total_correct_nc)
             batch_accuracy['total_com'].append(total_correct_com)
-            batch_accuracy['rewards'].append(rewards)
+            batch_accuracy['rewards_1'].append(rewards_1)
+            batch_accuracy['rewards_1'].append(rewards_1)
             batch_accuracy['total_acc_both_nc'].append(total_accuracy_nc)
             batch_accuracy['total_acc_both_com'].append(total_accuracy_com)
             batch_accuracy['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
@@ -1355,11 +1363,11 @@ def run():
                     sys.exit()
                 elif FLAGS.max_exchange == 1:
                     loss_binary_1, ent_bin_1 = calculate_loss_binary(
-                        feats_1[0], probs_1[0], rewards, r[0][0], FLAGS.entropy_agent1)
+                        feats_1[0], probs_1[0], rewards_1, r[0][0], FLAGS.entropy_agent1)
                     loss_binary_2, ent_bin_2 = calculate_loss_binary(
-                        feats_2[0], probs_2[0], rewards, r[1][0], FLAGS.entropy_agent2)
-                    loss_baseline_1 = calculate_loss_bas(r[0][0], rewards)
-                    loss_baseline_2 = calculate_loss_bas(r[1][0], rewards)
+                        feats_2[0], probs_2[0], rewards_2, r[1][0], FLAGS.entropy_agent2)
+                    loss_baseline_1 = calculate_loss_bas(r[0][0], rewards_1)
+                    loss_baseline_2 = calculate_loss_bas(r[1][0], rewards_2)
                     ent_agent1_bin = [ent_bin_1]
                     ent_agent2_bin = [ent_bin_2]
                 elif FLAGS.max_exchange > 1:
@@ -1707,6 +1715,8 @@ def flags():
                           "Encoding whether agents uses binary features")
     gflags.DEFINE_boolean("randomize_comms", True,
                           "Whether to randomize the order in which agents communicate")
+    gflags.DEFINE_boolean("cooperative_reward", True,
+                          "Whether to have a cooperative or individual reward structure")
     # gflags.DEFINE_boolean("ignore_2", False,
     #                       "Agent 1 ignores messages from Agent 2")
     # gflags.DEFINE_boolean("ignore_1", False,

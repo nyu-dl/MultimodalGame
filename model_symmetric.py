@@ -178,7 +178,7 @@ def add_data_point(batch, i, data_store, messages_1, messages_2):
     return data_store
 
 
-def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eval=True, callback=None):
+def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eval=True, callback=None, store_examples=False):
     """
     Function computing development accuracy
     """
@@ -488,8 +488,9 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eva
         hamming_1.append(mean_hamming_1)
         hamming_2.append(mean_hamming_2)
 
-        store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
-        store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger)
+        if store_examples:
+            store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
+            store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger)
         analyze_messages(correct_to_analyze, "correct", logger, flogger)
         analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger)
 
@@ -552,9 +553,9 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eva
     return total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra
 
 
-def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch):
+def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples):
     total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
-        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, in_domain_eval, callback=None)
+        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, in_domain_eval, callback=None, store_examples=store_examples)
     dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
     dev_accuracy_log['total_acc_both_com'].append(total_accuracy_com)
     dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
@@ -1667,7 +1668,7 @@ def run():
             if step % FLAGS.log_dev == 0:
                 # Report in domain development accuracy and checkpoint if best result
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch)
+                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True)
                 if step >= FLAGS.save_after and total_accuracy_com > best_dev_acc:
                     best_dev_acc = total_accuracy_com
                     flogger.Log(
@@ -1678,14 +1679,14 @@ def run():
                                optimizers_dict, gpu=0 if FLAGS.cuda else -1)
                 # Report out of domain development accuracy
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch)
+                    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch, store_examples=False)
 
             # Report in domain development accuracy when agents communicate with themselves
             if step % FLAGS.log_self_com == 0:
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch)
+                    agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False)
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch)
+                    agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False)
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:

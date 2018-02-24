@@ -1244,44 +1244,40 @@ def run():
             raise Exception("Must provide valid checkpoint.")
 
         debuglogger.info("Evaluating on in domain validation set")
-        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
-            FLAGS.dataset_indomain_valid_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval=True, callback=None)
-        flogger.Log(
-            "In domain dev accuracy no comms, both right: " + str(total_accuracy_nc))
-        flogger.Log(
-            "In domain dev accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
-        flogger.Log(
-            "In domain dev accuracy after comms, both right: " + str(total_accuracy_com))
-        flogger.Log(
-            "In domain dev accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
-        with open(FLAGS.id_eval_csv_file, 'w') as f:
-            f.write(
-                "checkpoint,eval_file,topk,step,best_dev_acc,eval_acc_nc_2,eval_acc_nc_1,eval_acc_com_2,eval_acc_com_1,convlen_1_mean,convlen_1_std,convlen_2_mean,convlen_2_std\n")
-            f.write("{},{},{},{},{},{},{},{}\n".format(
-                FLAGS.checkpoint, FLAGS.dataset_indomain_valid_path, FLAGS.top_k_dev,
-                step, best_dev_acc, total_accuracy_nc, atleast1_accuracy_nc, total_accuracy_com, atleast1_accuracy_com,
-                extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std'],
-                extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
+        step = i_batch = epoch = 0
+        dev_accuracy_id = {'total_acc_both_nc': [],  # % both agents right before comms
+                           'total_acc_both_com': [],  # % both agents right after comms
+                           'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                           'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                           }
 
-        debuglogger.info("Evaluating on out of  domain validation set")
-        total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
-            FLAGS.dataset_path, FLAGS.top_k_dev, agent1, agent2, in_domain_eval=False, callback=None)
-        flogger.Log(
-            "Out of domain dev accuracy no comms, both right: " + str(total_accuracy_nc))
-        flogger.Log(
-            "Out of domain dev accuracy no comms, at least 1 right: " + str(atleast1_accuracy_nc))
-        flogger.Log(
-            "Out of domain dev accuracy after comms, both right: " + str(total_accuracy_com))
-        flogger.Log(
-            "Out of domain dev accuracy after comms, at least 1 right: " + str(atleast1_accuracy_com))
-        with open(FLAGS.ood_eval_csv_file, 'w') as f:
-            f.write(
-                "checkpoint,eval_file,topk,step,best_dev_acc,eval_acc_nc_2,eval_acc_nc_1,eval_acc_com_2,eval_acc_com_1,convlen_1_mean,convlen_1_std,convlen_2_mean,convlen_2_std\n")
-            f.write("{},{},{},{},{},{},{},{}\n".format(
-                FLAGS.checkpoint, FLAGS.dataset_path, FLAGS.top_k_dev,
-                step, best_dev_acc, total_accuracy_nc, atleast1_accuracy_nc, total_accuracy_com, atleast1_accuracy_com,
-                extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std'],
-                extra['conversation_lengths_2_mean'], extra['conversation_lengths_2_std']))
+        dev_accuracy_ood = {'total_acc_both_nc': [],  # % both agents right before comms
+                            'total_acc_both_com': [],  # % both agents right after comms
+                            'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                            'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                            }
+        dev_accuracy_self_com_1 = {'total_acc_both_nc': [],  # % both agents right before comms
+                                   'total_acc_both_com': [],  # % both agents right after comms
+                                   'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                                   'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                                   }
+        dev_accuracy_self_com_2 = {'total_acc_both_nc': [],  # % both agents right before comms
+                                   'total_acc_both_com': [],  # % both agents right after comms
+                                   'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                                   'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                                   }
+        # Report in domain development accuracy and checkpoint if best result
+        dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+            agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True)
+        # Report out of domain development accuracy
+        dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+            agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch, store_examples=False)
+        # Report in domain development accuracy when agents communicate with themselves
+        if step % FLAGS.log_self_com == 0:
+            dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_1, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False)
+            dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_2, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False)
         sys.exit()
     elif FLAGS.binary_only:
         if not os.path.exists(FLAGS.checkpoint):
@@ -1331,6 +1327,16 @@ def run():
                             'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
                             'total_acc_atl1_com': []  # % at least 1 agent right after comms
                             }
+        dev_accuracy_self_com_1 = {'total_acc_both_nc': [],  # % both agents right before comms
+                                   'total_acc_both_com': [],  # % both agents right after comms
+                                   'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                                   'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                                   }
+        dev_accuracy_self_com_2 = {'total_acc_both_nc': [],  # % both agents right before comms
+                                   'total_acc_both_com': [],  # % both agents right after comms
+                                   'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                                   'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                                   }
 
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
@@ -1684,9 +1690,9 @@ def run():
             # Report in domain development accuracy when agents communicate with themselves
             if step % FLAGS.log_self_com == 0:
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False)
+                    agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_1, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False)
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False)
+                    agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_2, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False)
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:

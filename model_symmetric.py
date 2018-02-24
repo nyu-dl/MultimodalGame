@@ -38,6 +38,7 @@ FLAGS = gflags.FLAGS
 
 SHAPES = ['circle', 'cross', 'ellipse', 'pentagon', 'rectangle', 'semicircle', 'square', 'triangle']
 COLORS = ['blue', 'cyan', 'gray', 'green', 'magenta', 'red', 'yellow']
+MAX_EXAMPLES_TO_SAVE = 200
 
 
 def Variable(*args, **kwargs):
@@ -91,8 +92,33 @@ def store_exemplar_batch(data, data_type, logger, flogger):
     data_type: flag giving the name of the data to be stored.
                e.g. "correct", "incorrect"
     '''
-    # TODO
-    pass
+    debuglogger.info("Writing exemplar batch to file...")
+    assert len(masked_im_1) == len(masked_im_2) == len(p) == len(caption) == len(shapes) == len(colors) == len(texts)
+    num_examples = min(len(shapes), MAX_EXAMPLES_TO_SAVE)
+    path = FLAGS.log_path
+    prefix = FLAGS.experiment_name + "_" + data_type
+    # Save images
+    masked_im_1 = torch.cat(data["masked_im_1"][:num_examples], dim=0)
+    save_image(masked_im_1, path + '/' + prefix + '_im1.png', pad_value=0.5)
+    masked_im_2 = torch.cat(data["masked_im_2"][:num_examples], dim=0)
+    save_image(masked_im_2, path + '/' + prefix + '_im2.png', pad_value=0.5)
+    # Save other relevant info
+    keys = ['p', 'caption', 'shapes', 'colors']
+    for k in keys:
+        filename = path + '/' + prefix + '_' + k + '.txt'
+        with open(filename, "w") as wf:
+            for i in range(num_examples):
+                wf.write(f'Example {i+1}: {data[k][i]}')
+    # Write texts
+    filename = path + '/' + prefix + '_texts.txt'
+    with open(filename, "w") as wf:
+        for i in range(num_examples):
+            s = ""
+            for t in data["texts"][i]:
+                s += t + ", "
+            wf.write(f'Example {i+1}: {s}')
+    # Print average p
+    debuglogger.info(f'p: mean: {data["p"].mean() std: {data["p"].std()}')
 
 
 def calc_message_mean_and_std(m_store):
@@ -108,9 +134,98 @@ def calc_message_mean_and_std(m_store):
     return m_store
 
 
-def log_message_stats(m_store, logger, flogger):
-    # TODO
-    pass
+def log_message_stats(message_stats, logger, flogger, data_type):
+    debuglogger.info('Logging message stats')
+    shape_colors = []
+    for s in SHAPES:
+        for c in COLORS:
+            shape_colors.append(str(s) + "_" + str(c))
+    # log shape stats
+    for s in SHAPES:
+        means = []
+        stds = []
+        for i, m in enumerate(message_stats):
+            if s in message_stats[i]["shape"]:
+                m = message_stats[i]["shape"][s]["mean"]
+                st = message_stats[i]["shape"][s]["std"]
+                means.append(m)
+                stds.append(st)
+        dists = []
+        assert len(means) > 1
+        for i in range(len(means)):
+            for j in range(i + 1, len(means)):
+                d = torch.dist(means[i], means[j])
+                dists.append((i, j, d))
+            if i == len(means) - 2:
+                break
+        for i in range(len(means)):
+            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
+                       val=means[i], step=-1)
+            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
+                       val=stds[i], step=-1)
+            flogger.Log("{} message stats: shape {}: agent {}: mean: {}, std: {}".format(
+                data_type, s, i, means[i], stds[i]))
+        for i in range(len(dists)):
+            logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2])
+        flogger.Log("{} message stats: shape {}: dists: {}".format(data_type, s, dists))
+
+    # log color stats
+    for s in COLORS:
+        means = []
+        stds = []
+        for i, m in enumerate(message_stats):
+            if s in message_stats[i]["color"]:
+                m = message_stats[i]["color"][s]["mean"]
+                st = message_stats[i]["color"][s]["std"]
+                means.append(m)
+                stds.append(st)
+        dists = []
+        assert len(means) > 1
+        for i in range(len(means)):
+            for j in range(i + 1, len(means)):
+                d = torch.dist(means[i], means[j])
+                dists.append((i, j, d))
+            if i == len(means) - 2:
+                break
+        for i in range(len(means)):
+            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
+                       val=means[i], step=-1)
+            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
+                       val=stds[i], step=-1)
+            flogger.Log("{} message stats: shape {}: agent {}: mean: {}, std: {}".format(
+                data_type, s, i, means[i], stds[i]))
+        for i in range(len(dists)):
+            logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2])
+        flogger.Log("{} message stats: shape {}: dists: {}".format(data_type, s, dists))
+
+        # log shape - color stats
+        for s in shape_colors:
+            means = []
+            stds = []
+            for i, m in enumerate(message_stats):
+                if s in message_stats[i]["shape_color"]:
+                    m = message_stats[i]["shape_color"][s]["mean"]
+                    st = message_stats[i]["shape_color"][s]["std"]
+                    means.append(m)
+                    stds.append(st)
+            dists = []
+            assert len(means) > 1
+            for i in range(len(means)):
+                for j in range(i + 1, len(means)):
+                    d = torch.dist(means[i], means[j])
+                    dists.append((i, j, d))
+                if i == len(means) - 2:
+                    break
+            for i in range(len(means)):
+                logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
+                           val=means[i], step=-1)
+                logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
+                           val=stds[i], step=-1)
+                flogger.Log("{} message stats: shape {}: agent {}: mean: {}, std: {}".format(
+                    data_type, s, i, means[i], stds[i]))
+            for i in range(len(dists)):
+                logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2])
+            flogger.Log("{} message stats: shape {}: dists: {}".format(data_type, s, dists))
 
 
 def analyze_messages(messages, shapes, colors, data_type, logger, flogger):
@@ -125,14 +240,20 @@ def analyze_messages(messages, shapes, colors, data_type, logger, flogger):
     Each message list should have the same length and the shape and colors lists
     '''
     # TODO - check
+    message_stats = []
     for m_set in messages:
         assert len(m_set) == len(shapes)
         assert len(m_set) == len(colors)
+        d = {"shape": {},
+             "color": {},
+             "shape_color": {}
+             }
+        message_stats.append(d)
 
     for i, m_set in enumerate(messages):
-        s_store = {}
-        c_store = {}
-        s_c_store = {}
+        s_store = message_stats[i]["shape"]
+        c_store = message_stats[i]["color"]
+        s_c_store = message_stats[i]["shape_color"]
         # Collect all messages
         for m, s, c in zip(m_set, shapes, colors):
             if s in s_store:
@@ -156,11 +277,9 @@ def analyze_messages(messages, shapes, colors, data_type, logger, flogger):
                 s_c_store[s_c]["message"] = [m]
         # Calculate and log mean and std_dev
         s_store = calc_message_mean_and_std(s_store)
-        log_message_stats(s_store, logger, flogger)
         c_store = calc_message_mean_and_std(c_store)
-        log_message_stats(c_store, logger, flogger)
         s_c_store = calc_message_mean_and_std(s_c_store)
-        log_message_stats(s_c_store, logger, flogger)
+    log_message_stats(message_stats, logger, flogger, data_type)
 
 
 def add_data_point(batch, i, data_store, messages_1, messages_2):

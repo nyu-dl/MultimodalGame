@@ -18,6 +18,7 @@ from torch.nn.parameter import Parameter
 import torchvision.models as models
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
+from torchvision.utils import save_image
 
 from sklearn.metrics import confusion_matrix
 
@@ -92,33 +93,39 @@ def store_exemplar_batch(data, data_type, logger, flogger):
     data_type: flag giving the name of the data to be stored.
                e.g. "correct", "incorrect"
     '''
+    debuglogger.info(f'Num {data_type}: {len(data["masked_im_1"])}')
     debuglogger.info("Writing exemplar batch to file...")
-    assert len(masked_im_1) == len(masked_im_2) == len(p) == len(caption) == len(shapes) == len(colors) == len(texts)
-    num_examples = min(len(shapes), MAX_EXAMPLES_TO_SAVE)
+    assert len(data["masked_im_1"]) == len(data["masked_im_2"]) == len(data["p"]) == len(data["caption"]) == len(data["shapes"]) == len(data["colors"]) == len(data["texts"])
+    num_examples = min(len(data["shapes"]), MAX_EXAMPLES_TO_SAVE)
     path = FLAGS.log_path
     prefix = FLAGS.experiment_name + "_" + data_type
+    if not os.path.exists(path + "/" + prefix):
+        os.makedirs(path + "/" + prefix)
     # Save images
-    masked_im_1 = torch.cat(data["masked_im_1"][:num_examples], dim=0)
-    save_image(masked_im_1, path + '/' + prefix + '_im1.png', pad_value=0.5)
-    masked_im_2 = torch.cat(data["masked_im_2"][:num_examples], dim=0)
-    save_image(masked_im_2, path + '/' + prefix + '_im2.png', pad_value=0.5)
+    masked_im_1 = torch.stack(data["masked_im_1"][:num_examples], dim=0)
+    debuglogger.debug(f'Masked im 1: {type(masked_im_1)}')
+    debuglogger.debug(f'Masked im 1: {masked_im_1.size()}')
+    save_image(masked_im_1, path + '/' + prefix + '/im1.png', nrow=16, pad_value=0.5)
+    masked_im_2 = torch.stack(data["masked_im_2"][:num_examples], dim=0)
+    save_image(masked_im_2, path + '/' + prefix + '/im2.png', nrow=16, pad_value=0.5)
     # Save other relevant info
     keys = ['p', 'caption', 'shapes', 'colors']
     for k in keys:
-        filename = path + '/' + prefix + '_' + k + '.txt'
+        filename = path + '/' + prefix + '/' + k + '.txt'
         with open(filename, "w") as wf:
             for i in range(num_examples):
-                wf.write(f'Example {i+1}: {data[k][i]}')
+                wf.write(f'Example {i+1}: {data[k][i]}\n')
     # Write texts
-    filename = path + '/' + prefix + '_texts.txt'
+    filename = path + '/' + prefix + '/texts.txt'
     with open(filename, "w") as wf:
         for i in range(num_examples):
             s = ""
             for t in data["texts"][i]:
                 s += t + ", "
-            wf.write(f'Example {i+1}: {s}')
+            wf.write(f'Example {i+1}: {s}\n')
     # Print average and std p
-    debuglogger.info(f'p: mean: {data["p"].mean() std: {data["p"].std()}')
+    np_p = np.array(data["p"])
+    debuglogger.info(f'p: mean: {np.mean(np_p)} std: {np.std(np_p)}')
 
 
 def calc_message_mean_and_std(m_store):
@@ -127,8 +134,8 @@ def calc_message_mean_and_std(m_store):
         msgs = m_store[k]["message"]
         msgs = torch.cat(msgs, dim=0)
         debuglogger.debug(f'Count: {m_store[k]["count"]}, Messages: {msgs.size()}')
-        mean = torch.mean(msgs, dim=0)
-        std = torch.std(msgs, dim=0)
+        mean = torch.mean(msgs, dim=0).cpu().data
+        std = torch.std(msgs, dim=0).cpu().data
         m_store[k]["mean"] = mean
         m_store[k]["std"] = std
     return m_store
@@ -142,6 +149,7 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
             shape_colors.append(str(s) + "_" + str(c))
     # log shape stats
     for s in SHAPES:
+        num = message_stats[i]["shape"][s]["count"]
         means = []
         stds = []
         for i, m in enumerate(message_stats):
@@ -158,6 +166,8 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
                 dists.append((i, j, d))
             if i == len(means) - 2:
                 break
+        logger.log(key=data_type + ": " + s + " message stats: count: ",
+            val=num, step=step)
         for i in range(len(means)):
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
                        val=means[i], step=step)
@@ -171,6 +181,7 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
 
     # log color stats
     for s in COLORS:
+        num = message_stats[i]["color"][s]["count"]
         means = []
         stds = []
         for i, m in enumerate(message_stats):
@@ -187,6 +198,8 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
                 dists.append((i, j, d))
             if i == len(means) - 2:
                 break
+        logger.log(key=data_type + ": " + s + " message stats: count: ",
+            val=num, step=step)
         for i in range(len(means)):
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
                        val=means[i], step=step)
@@ -198,34 +211,37 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
             logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
         flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: dists: {}".format(epoch, step, i_batch, data_type, s, dists))
 
-        # log shape - color stats
-        for s in shape_colors:
-            means = []
-            stds = []
-            for i, m in enumerate(message_stats):
-                if s in message_stats[i]["shape_color"]:
-                    m = message_stats[i]["shape_color"][s]["mean"]
-                    st = message_stats[i]["shape_color"][s]["std"]
-                    means.append(m)
-                    stds.append(st)
-            dists = []
-            assert len(means) > 1
-            for i in range(len(means)):
-                for j in range(i + 1, len(means)):
-                    d = torch.dist(means[i], means[j])
-                    dists.append((i, j, d))
-                if i == len(means) - 2:
-                    break
-            for i in range(len(means)):
-                logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
+    # log shape - color stats
+    for s in shape_colors:
+        num = message_stats[i]["shape_color"][s]["count"]
+        means = []
+        stds = []
+        for i, m in enumerate(message_stats):
+            if s in message_stats[i]["shape_color"]:
+                m = message_stats[i]["shape_color"][s]["mean"]
+                st = message_stats[i]["shape_color"][s]["std"]
+                means.append(m)
+                stds.append(st)
+        dists = []
+        assert len(means) > 1
+        for i in range(len(means)):
+            for j in range(i + 1, len(means)):
+                d = torch.dist(means[i], means[j])
+                dists.append((i, j, d))
+            if i == len(means) - 2:
+                break
+        logger.log(key=data_type + ": " + s + " message stats: count: ",
+            val=num, step=step)
+        for i in range(len(means)):
+            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
                            val=means[i], step=step)
-                logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
+            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
                            val=stds[i], step=step)
-                flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: agent {}: mean: {}, std: {}".format(
+            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: agent {}: mean: {}, std: {}".format(
                     epoch, step, i_batch, data_type, s, i, means[i], stds[i]))
-            for i in range(len(dists)):
-                logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
-            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: dists: {}".format(
+        for i in range(len(dists)):
+            logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
+        flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: dists: {}".format(
                 epoch, step, i_batch, data_type, s, dists))
 
 
@@ -289,13 +305,23 @@ def add_data_point(batch, i, data_store, messages_1, messages_2):
     data_store["masked_im_1"].append(batch["masked_im_1"][i])
     data_store["masked_im_2"].append(batch["masked_im_2"][i])
     data_store["p"].append(batch["p"][i])
-    data_store["msg_1"].append(batch["msg_1"][i])
-    data_store["msg_2"].append(batch["msg_2"][i])
     data_store["target"].append(batch["target"][i])
-    data_store["caption"].append(batch["caption"][i])
+    data_store["caption"].append(batch["caption_str"][i])
     data_store["shapes"].append(batch["shapes"][i])
     data_store["colors"].append(batch["colors"][i])
-    data_store["texts"].append(batch["texts"][i])
+    data_store["texts"].append(batch["texts_str"][i])
+    # Add messages from each exchange
+    m_1 = []
+    for exchange in messages_1:
+        #debuglogger.debug(f'Exchange agent 1: {exchange[i]}')
+        m_1.append(exchange[i])
+    data_store["msg_1"].append(m_1)
+    m_2 = []
+    for exchange in messages_2:
+        #debuglogger.debug(f'Exchange agent 2: {exchange[i]}')
+        m_2.append(exchange[i])
+    data_store["msg_2"].append(m_2)
+    #debuglogger.debug(f'Data store: {data_store}')
     return data_store
 
 
@@ -608,12 +634,6 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
         hamming_1.append(mean_hamming_1)
         hamming_2.append(mean_hamming_2)
 
-        if store_examples:
-            store_exemplar_batch(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
-            store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
-        analyze_messages(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
-        analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
-
         if callback is not None:
             callback_dict = dict(
                 s_masks_1=s_masks_1,
@@ -630,6 +650,13 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 y=y)
             callback(agent1, agent2, batch, callback_dict)
         # break
+   
+    if store_examples:
+        store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
+        store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger)
+    sys.exit()
+    analyze_messages(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
+    analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
 
     # Print confusion matrix
     true_labels = np.concatenate(true_labels).reshape(-1)

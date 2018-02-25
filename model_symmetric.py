@@ -75,7 +75,7 @@ def loglikelihood(log_prob, target):
 
 
 def store_exemplar_batch(data, data_type, logger, flogger):
-    '''Writes 100 examples in the data to file for debugging
+    '''Writes MAX_EXAMPLES_TO_SAVE examples in the data to file for debugging
 
     data: dictionary containing data and results
         data = {"masked_im_1": [],
@@ -117,7 +117,7 @@ def store_exemplar_batch(data, data_type, logger, flogger):
             for t in data["texts"][i]:
                 s += t + ", "
             wf.write(f'Example {i+1}: {s}')
-    # Print average p
+    # Print average and std p
     debuglogger.info(f'p: mean: {data["p"].mean() std: {data["p"].std()}')
 
 

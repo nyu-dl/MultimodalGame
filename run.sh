@@ -1,0 +1,6 @@
+#!/bin/bash
+
+#python model_symmetric.py  -experiment_name test_training -exchange_samples 0 -model_type Fixed -max_exchange 1 -batch_size 32 -batch_size_dev 50 -m_dim 50 -h_dim 100 -desc_dim 100 -num_classes 10 -learning_rate 1e-4 -entropy_agent1 0.01 -entropy_agent2 0.01 -use_binary -max_epoch 250 -top_k_dev 1 -top_k_train 1 -dataset_path ./data/oneshape_simple_textselect -dataset_name oneshape_simple_textselect -dataset_size_train 500 -dataset_size_dev 100  -wv_dim 100 -glove_path /scratch/lhg256/comms/glove/glove.6B.100d.txt -log_path ./logs -debug_log_level INFO -cuda -log_interval 25 -log_dev 100
+
+# Test run local
+python model_symmetric.py  -experiment_name test -exchange_samples 0 -model_type Fixed -max_exchange 1 -batch_size 8 -batch_size_dev 16 -m_dim 50 -h_dim 100 -desc_dim 100 -num_classes 10 -learning_rate 1e-4 -entropy_agent1 0.01 -entropy_agent2 0.01 -use_binary -max_epoch 2 -top_k_dev 1 -top_k_train 1 -dataset_path ./data/oneshape_simple_textselect -dataset_indomain_valid_path ./data/oneshape_simple_textselect -dataset_name oneshape_simple_textselect -dataset_size_train 50 -dataset_size_dev 32  -wv_dim 100 -glove_path ./glove.6B/glove.6B.100d.txt -log_path ./logs -debug_log_level INFO -log_interval 25 -log_dev 100

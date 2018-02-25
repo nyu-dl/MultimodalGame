@@ -1,0 +1,3 @@
+[submodule "ShapeWorld"]
+	path = ShapeWorld
+	url = https://github.com/lgraesser/ShapeWorld.git

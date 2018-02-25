@@ -230,7 +230,8 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
 
 
 def analyze_messages(messages, shapes, colors, data_type, logger, flogger, epoch, step, i_batch):
-    '''Prints the mean and std deviation per set of messages per shape, per color and per shape-color for each message set
+    '''Logs the mean and std deviation per set of messages per shape, per color and per shape-color for each message set.
+      Additionally logs the distances between the mean message for each agent type per shape, color and shape-color
 
     messages: list of lists of messages. Each list contains the messages sent for an agent
     shapes: list of shapes contained in the images (subjects of the message)

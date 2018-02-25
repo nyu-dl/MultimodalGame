@@ -32,7 +32,7 @@ from misc import build_mask
 
 from eval_model import get_and_log_dev_performance
 from agents import Agent
-from dataset_loader import load_shapeworld_dataset
+from dataset_loader import load_shapeworld_dataset, store_exemplar_batch
 from binary_vectors import extract_binary
 from sparks import sparks
 

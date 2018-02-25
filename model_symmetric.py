@@ -134,7 +134,7 @@ def calc_message_mean_and_std(m_store):
     return m_store
 
 
-def log_message_stats(message_stats, logger, flogger, data_type):
+def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_batch):
     debuglogger.info('Logging message stats')
     shape_colors = []
     for s in SHAPES:
@@ -160,14 +160,14 @@ def log_message_stats(message_stats, logger, flogger, data_type):
                 break
         for i in range(len(means)):
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
-                       val=means[i], step=-1)
+                       val=means[i], step=step)
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
-                       val=stds[i], step=-1)
-            flogger.Log("{} message stats: shape {}: agent {}: mean: {}, std: {}".format(
-                data_type, s, i, means[i], stds[i]))
+                       val=stds[i], step=step)
+            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: agent {}: mean: {}, std: {}".format(
+                epoch, step, i_batch, data_type, s, i, means[i], stds[i]))
         for i in range(len(dists)):
-            logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2])
-        flogger.Log("{} message stats: shape {}: dists: {}".format(data_type, s, dists))
+            logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
+        flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: dists: {}".format(epoch, step, i_batch, data_type, s, dists))
 
     # log color stats
     for s in COLORS:
@@ -189,14 +189,14 @@ def log_message_stats(message_stats, logger, flogger, data_type):
                 break
         for i in range(len(means)):
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
-                       val=means[i], step=-1)
+                       val=means[i], step=step)
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
-                       val=stds[i], step=-1)
-            flogger.Log("{} message stats: shape {}: agent {}: mean: {}, std: {}".format(
-                data_type, s, i, means[i], stds[i]))
+                       val=stds[i], step=step)
+            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: agent {}: mean: {}, std: {}".format(
+                epoch, step, i_batch, data_type, s, i, means[i], stds[i]))
         for i in range(len(dists)):
-            logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2])
-        flogger.Log("{} message stats: shape {}: dists: {}".format(data_type, s, dists))
+            logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
+        flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: dists: {}".format(epoch, step, i_batch, data_type, s, dists))
 
         # log shape - color stats
         for s in shape_colors:
@@ -218,17 +218,18 @@ def log_message_stats(message_stats, logger, flogger, data_type):
                     break
             for i in range(len(means)):
                 logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
-                           val=means[i], step=-1)
+                           val=means[i], step=step)
                 logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
-                           val=stds[i], step=-1)
-                flogger.Log("{} message stats: shape {}: agent {}: mean: {}, std: {}".format(
-                    data_type, s, i, means[i], stds[i]))
+                           val=stds[i], step=step)
+                flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: agent {}: mean: {}, std: {}".format(
+                    epoch, step, i_batch, data_type, s, i, means[i], stds[i]))
             for i in range(len(dists)):
-                logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2])
-            flogger.Log("{} message stats: shape {}: dists: {}".format(data_type, s, dists))
+                logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
+            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: dists: {}".format(
+                epoch, step, i_batch, data_type, s, dists))
 
 
-def analyze_messages(messages, shapes, colors, data_type, logger, flogger):
+def analyze_messages(messages, shapes, colors, data_type, logger, flogger, epoch, step, i_batch):
     '''Prints the mean and std deviation per set of messages per shape, per color and per shape-color for each message set
 
     messages: list of lists of messages. Each list contains the messages sent for an agent
@@ -279,7 +280,7 @@ def analyze_messages(messages, shapes, colors, data_type, logger, flogger):
         s_store = calc_message_mean_and_std(s_store)
         c_store = calc_message_mean_and_std(c_store)
         s_c_store = calc_message_mean_and_std(s_c_store)
-    log_message_stats(message_stats, logger, flogger, data_type)
+    log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_batch)
 
 
 def add_data_point(batch, i, data_store, messages_1, messages_2):
@@ -608,10 +609,10 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eva
         hamming_2.append(mean_hamming_2)
 
         if store_examples:
-            store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
-            store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger)
-        analyze_messages(correct_to_analyze, "correct", logger, flogger)
-        analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger)
+            store_exemplar_batch(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
+            store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
+        analyze_messages(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
+        analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
 
         if callback is not None:
             callback_dict = dict(
@@ -674,7 +675,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eva
 
 def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples):
     total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
-        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, in_domain_eval, callback=None, store_examples=store_examples)
+        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, in_domain_eval, epoch, step, i_batch, callback=None, store_examples=store_examples)
     dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
     dev_accuracy_log['total_acc_both_com'].append(total_accuracy_com)
     dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)

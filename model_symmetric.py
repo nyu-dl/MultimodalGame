@@ -299,7 +299,7 @@ def add_data_point(batch, i, data_store, messages_1, messages_2):
     return data_store
 
 
-def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eval=True, callback=None, store_examples=False):
+def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=True, callback=None, store_examples=False):
     """
     Function computing development accuracy
     """
@@ -381,8 +381,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eva
     else:
         eval_mode = FLAGS.dataset_eval_mode
         debuglogger.info("Evaluating on out of domain validation set")
-    dev_loader = load_shapeworld_dataset(dataset_path, FLAGS.glove_path, eval_mode, FLAGS.dataset_size_dev, FLAGS.dataset_type, FLAGS.dataset_name,
-                                         FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
+    dev_loader = load_shapeworld_dataset(dataset_path, FLAGS.glove_path, eval_mode, FLAGS.dataset_size_dev, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
 
     for batch in dev_loader:
         target = batch["target"]
@@ -676,7 +675,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, in_domain_eva
 
 def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples):
     total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
-        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, in_domain_eval, epoch, step, i_batch, callback=None, store_examples=store_examples)
+        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=in_domain_eval, callback=None, store_examples=store_examples)
     dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
     dev_accuracy_log['total_acc_both_com'].append(total_accuracy_com)
     dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)

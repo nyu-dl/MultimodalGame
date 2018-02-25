@@ -7,6 +7,7 @@ import random
 import h5py
 import functools
 import logging
+import pickle
 
 import torch
 import torch.nn as nn
@@ -132,10 +133,10 @@ def calc_message_mean_and_std(m_store):
     # TODO comments and check
     for k in m_store:
         msgs = m_store[k]["message"]
-        msgs = torch.cat(msgs, dim=0)
-        debuglogger.debug(f'Count: {m_store[k]["count"]}, Messages: {msgs.size()}')
-        mean = torch.mean(msgs, dim=0).cpu().data
-        std = torch.std(msgs, dim=0).cpu().data
+        msgs = torch.stack(msgs, dim=0)
+        debuglogger.debug(f'Key: {k}, Count: {m_store[k]["count"]}, Messages: {msgs.size()}')
+        mean = torch.mean(msgs, dim=0).cpu()
+        std = torch.std(msgs, dim=0).cpu()
         m_store[k]["mean"] = mean
         m_store[k]["std"] = std
     return m_store
@@ -149,23 +150,29 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
             shape_colors.append(str(s) + "_" + str(c))
     # log shape stats
     for s in SHAPES:
-        num = message_stats[i]["shape"][s]["count"]
+        num = 0
+        if s in message_stats[0]["shape"]:
+            num = message_stats[0]["shape"][s]["count"]
         means = []
         stds = []
         for i, m in enumerate(message_stats):
             if s in message_stats[i]["shape"]:
+                assert num == message_stats[i]["shape"][s]["count"]
                 m = message_stats[i]["shape"][s]["mean"]
                 st = message_stats[i]["shape"][s]["std"]
                 means.append(m)
                 stds.append(st)
         dists = []
-        assert len(means) > 1
+        assert len(means) != 1
         for i in range(len(means)):
             for j in range(i + 1, len(means)):
                 d = torch.dist(means[i], means[j])
                 dists.append((i, j, d))
             if i == len(means) - 2:
                 break
+        #debuglogger.debug(f'Means: {means}')
+        #debuglogger.debug(f'Std: {stds}')
+        #debuglogger.debug(f'Distances: {dists}')
         logger.log(key=data_type + ": " + s + " message stats: count: ",
             val=num, step=step)
         for i in range(len(means)):
@@ -173,25 +180,28 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
                        val=means[i], step=step)
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
                        val=stds[i], step=step)
-            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: agent {}: mean: {}, std: {}".format(
-                epoch, step, i_batch, data_type, s, i, means[i], stds[i]))
+            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: count: {}, agent {}: mean: {}, std: {}".format(
+                epoch, step, i_batch, data_type, s, num, i, means[i], stds[i]))
         for i in range(len(dists)):
             logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
         flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: dists: {}".format(epoch, step, i_batch, data_type, s, dists))
 
     # log color stats
     for s in COLORS:
-        num = message_stats[i]["color"][s]["count"]
+        num = 0
+        if s in message_stats[0]["color"]:
+            num = message_stats[0]["color"][s]["count"]
         means = []
         stds = []
         for i, m in enumerate(message_stats):
             if s in message_stats[i]["color"]:
+                assert num == message_stats[i]["color"][s]["count"]
                 m = message_stats[i]["color"][s]["mean"]
                 st = message_stats[i]["color"][s]["std"]
                 means.append(m)
                 stds.append(st)
         dists = []
-        assert len(means) > 1
+        assert len(means) != 1
         for i in range(len(means)):
             for j in range(i + 1, len(means)):
                 d = torch.dist(means[i], means[j])
@@ -205,25 +215,28 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
                        val=means[i], step=step)
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
                        val=stds[i], step=step)
-            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: agent {}: mean: {}, std: {}".format(
-                epoch, step, i_batch, data_type, s, i, means[i], stds[i]))
+            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: color {}: count: {}, agent {}: mean: {}, std: {}".format(
+                epoch, step, i_batch, data_type, s, num, i, means[i], stds[i]))
         for i in range(len(dists)):
             logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
-        flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: dists: {}".format(epoch, step, i_batch, data_type, s, dists))
+        flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: color {}: dists: {}".format(epoch, step, i_batch, data_type, s, dists))
 
     # log shape - color stats
     for s in shape_colors:
-        num = message_stats[i]["shape_color"][s]["count"]
+        num = 0
+        if s in message_stats[0]["shape_color"]:
+            num = message_stats[0]["shape_color"][s]["count"]
         means = []
         stds = []
         for i, m in enumerate(message_stats):
             if s in message_stats[i]["shape_color"]:
+                assert num == message_stats[i]["shape_color"][s]["count"]
                 m = message_stats[i]["shape_color"][s]["mean"]
                 st = message_stats[i]["shape_color"][s]["std"]
                 means.append(m)
                 stds.append(st)
         dists = []
-        assert len(means) > 1
+        assert len(means) != 1
         for i in range(len(means)):
             for j in range(i + 1, len(means)):
                 d = torch.dist(means[i], means[j])
@@ -237,28 +250,32 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
                            val=means[i], step=step)
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
                            val=stds[i], step=step)
-            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: agent {}: mean: {}, std: {}".format(
-                    epoch, step, i_batch, data_type, s, i, means[i], stds[i]))
+            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape_color {}: count: {}, agent {}: mean: {}, std: {}".format(
+                    epoch, step, i_batch, data_type, s, num, i, means[i], stds[i]))
         for i in range(len(dists)):
             logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
-        flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape {}: dists: {}".format(
+        flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape_color {}: dists: {}".format(
                 epoch, step, i_batch, data_type, s, dists))
+    path = FLAGS.log_path + "/" + FLAGS.experiment_name + "_" + data_type + "_message_stats.pkl" 
+    pickle.dump(message_stats, open(path, "wb"))
+    debuglogger.info(f'Saved message stats to log file')
 
 
-def analyze_messages(messages, shapes, colors, data_type, logger, flogger, epoch, step, i_batch):
+def run_analyze_messages(data,  data_type, logger, flogger, epoch, step, i_batch):
     '''Logs the mean and std deviation per set of messages per shape, per color and per shape-color for each message set.
       Additionally logs the distances between the mean message for each agent type per shape, color and shape-color
 
-    messages: list of lists of messages. Each list contains the messages sent for an agent
-    shapes: list of shapes contained in the images (subjects of the message)
-    colors: list of colors contained in the image (subjects of the message)
+    data: dictionary containing log of data_type examples
     data_type: flag explaining the type of data
                e.g. "correct", "incorrect"
 
     Each message list should have the same length and the shape and colors lists
+    Also saves the messages and analysis to file
     '''
-    # TODO - check
     message_stats = []
+    messages = [data["msg_1"], data["msg_2"]]
+    shapes = data["shapes"]
+    colors = data["colors"]
     for m_set in messages:
         assert len(m_set) == len(shapes)
         assert len(m_set) == len(colors)
@@ -267,32 +284,61 @@ def analyze_messages(messages, shapes, colors, data_type, logger, flogger, epoch
              "shape_color": {}
              }
         message_stats.append(d)
-
+    debuglogger.info(f'Messages: {len(messages[0])}, {len(messages[0][0])}')
     for i, m_set in enumerate(messages):
         s_store = message_stats[i]["shape"]
         c_store = message_stats[i]["color"]
         s_c_store = message_stats[i]["shape_color"]
         # Collect all messages
+        j = 0
         for m, s, c in zip(m_set, shapes, colors):
             if s in s_store:
-                s_store[s]["count"] += 1
-                s_store[s]["message"].append(m)
+                # Potentially multiple exchanges
+                for m_i in m:
+                    s_store[s]["count"] += 1
+                    s_store[s]["message"].append(m_i.data)
             else:
-                s_store[s]["count"] = 0
-                s_store[s]["message"] = [m]
+                s_store[s] = {}
+                s_store[s]["count"] = 1
+                s_store[s]["message"] = [m[0].data]
+                if len(m) > 1:
+                    for m_i in m[1:]:
+                        s_store[s]["count"] += 1
+                        s_store[s]["message"].append(m_i.data)
             if c in c_store:
-                c_store[c]["count"] += 1
-                c_store[c]["message"].append(m)
+                # Potentially multiple exchanges
+                for m_i in m:
+                    c_store[c]["count"] += 1
+                    c_store[c]["message"].append(m_i.data)
             else:
-                c_store[c]["count"] = 0
-                c_store[c]["message"] = [m]
+                c_store[c] = {}
+                c_store[c]["count"] = 1
+                c_store[c]["message"] = [m[0].data]
+                if len(m) > 1:
+                    for m_i in m[1:]:
+                        c_store[c]["count"] += 1
+                        c_store[c]["message"].append(m_i.data)
+            
             s_c = str(s) + "_" + str(c)
             if s_c in s_c_store:
-                s_c_store[s_c]["count"] += 1
-                s_c_store[s_c]["message"].append(m)
+                # Potentially multiple exchanges
+                for m_i in m:
+                    s_c_store[s_c]["count"] += 1
+                    s_c_store[s_c]["message"].append(m_i.data)
             else:
-                s_c_store[s_c]["count"] = 0
-                s_c_store[s_c]["message"] = [m]
+                s_c_store[s_c] = {}
+                s_c_store[s_c]["count"] = 1
+                s_c_store[s_c]["message"] = [m[0].data]
+                if len(m) > 1:
+                    for m_i in m[1:]:
+                        s_c_store[s_c]["count"] += 1
+                        s_c_store[s_c]["message"].append(m_i.data)
+            if j == 5:
+                debuglogger.debug(f's_store: {s_store}')
+                debuglogger.debug(f'c_store: {c_store}')
+                debuglogger.debug(f's_c_store: {s_c_store}')
+                #sys.exit()
+            j += 1
         # Calculate and log mean and std_dev
         s_store = calc_message_mean_and_std(s_store)
         c_store = calc_message_mean_and_std(c_store)
@@ -325,7 +371,7 @@ def add_data_point(batch, i, data_store, messages_1, messages_2):
     return data_store
 
 
-def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=True, callback=None, store_examples=False):
+def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=True, callback=None, store_examples=False, analyze_messages=True):
     """
     Function computing development accuracy
     """
@@ -654,9 +700,9 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
     if store_examples:
         store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
         store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger)
-    sys.exit()
-    analyze_messages(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
-    analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
+    if analyze_messages:
+        run_analyze_messages(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
+        #run_analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
 
     # Print confusion matrix
     true_labels = np.concatenate(true_labels).reshape(-1)
@@ -700,9 +746,9 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
     return total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra
 
 
-def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples):
+def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages):
     total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
-        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=in_domain_eval, callback=None, store_examples=store_examples)
+        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=in_domain_eval, callback=None, store_examples=store_examples, analyze_messages=analyze_messages)
     dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
     dev_accuracy_log['total_acc_both_com'].append(total_accuracy_com)
     dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
@@ -1415,16 +1461,16 @@ def run():
                                    }
         # Report in domain development accuracy and checkpoint if best result
         dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-            agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True)
+            agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True, analyze_messages=True)
         # Report out of domain development accuracy
         dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-            agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch, store_examples=False)
+            agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
         # Report in domain development accuracy when agents communicate with themselves
         if step % FLAGS.log_self_com == 0:
             dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_1, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False)
+                agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_1, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
             dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_2, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False)
+                agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_2, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
         sys.exit()
     elif FLAGS.binary_only:
         if not os.path.exists(FLAGS.checkpoint):
@@ -1821,7 +1867,7 @@ def run():
             if step % FLAGS.log_dev == 0:
                 # Report in domain development accuracy and checkpoint if best result
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True)
+                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True, analyze_messages=True)
                 if step >= FLAGS.save_after and total_accuracy_com > best_dev_acc:
                     best_dev_acc = total_accuracy_com
                     flogger.Log(
@@ -1832,14 +1878,14 @@ def run():
                                optimizers_dict, gpu=0 if FLAGS.cuda else -1)
                 # Report out of domain development accuracy
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch, store_examples=False)
+                    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
 
             # Report in domain development accuracy when agents communicate with themselves
             if step % FLAGS.log_self_com == 0:
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_1, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False)
+                    agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_1, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_2, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False)
+                    agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_2, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:

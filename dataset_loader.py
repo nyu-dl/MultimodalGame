@@ -227,59 +227,6 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         yield batch
 
 
-def store_exemplar_batch(data, data_type, logger, flogger):
-    '''Writes MAX_EXAMPLES_TO_SAVE examples in the data to file for debugging
-
-    data: dictionary containing data and results
-        data = {"masked_im_1": [],
-                "masked_im_2": [],
-                "msg_1": [],
-                "msg_2": [],
-                "p": [],
-                "target": [],
-                "caption": [],
-                "shapes": [],
-                "colors": [],
-                "texts": [],
-                }
-    data_type: flag giving the name of the data to be stored.
-               e.g. "correct", "incorrect"
-    '''
-    debuglogger.info(f'Num {data_type}: {len(data["masked_im_1"])}')
-    debuglogger.info("Writing exemplar batch to file...")
-    assert len(data["masked_im_1"]) == len(data["masked_im_2"]) == len(data["p"]) == len(data["caption"]) == len(data["shapes"]) == len(data["colors"]) == len(data["texts"])
-    num_examples = min(len(data["shapes"]), MAX_EXAMPLES_TO_SAVE)
-    path = FLAGS.log_path
-    prefix = FLAGS.experiment_name + "_" + data_type
-    if not os.path.exists(path + "/" + prefix):
-        os.makedirs(path + "/" + prefix)
-    # Save images
-    masked_im_1 = torch.stack(data["masked_im_1"][:num_examples], dim=0)
-    debuglogger.debug(f'Masked im 1: {type(masked_im_1)}')
-    debuglogger.debug(f'Masked im 1: {masked_im_1.size()}')
-    save_image(masked_im_1, path + '/' + prefix + '/im1.png', nrow=16, pad_value=0.5)
-    masked_im_2 = torch.stack(data["masked_im_2"][:num_examples], dim=0)
-    save_image(masked_im_2, path + '/' + prefix + '/im2.png', nrow=16, pad_value=0.5)
-    # Save other relevant info
-    keys = ['p', 'caption', 'shapes', 'colors']
-    for k in keys:
-        filename = path + '/' + prefix + '/' + k + '.txt'
-        with open(filename, "w") as wf:
-            for i in range(num_examples):
-                wf.write(f'Example {i+1}: {data[k][i]}\n')
-    # Write texts
-    filename = path + '/' + prefix + '/texts.txt'
-    with open(filename, "w") as wf:
-        for i in range(num_examples):
-            s = ""
-            for t in data["texts"][i]:
-                s += t + ", "
-            wf.write(f'Example {i+1}: {s}\n')
-    # Print average and std p
-    np_p = np.array(data["p"])
-    debuglogger.info(f'p: mean: {np.mean(np_p)} std: {np.std(np_p)}')
-
-
 if __name__ == "__main__":
     # Settings
     gflags.DEFINE_enum("resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")

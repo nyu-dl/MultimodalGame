@@ -1693,11 +1693,11 @@ def run():
                     ent_agent2_bin = [ent_bin_2]
                 elif FLAGS.max_exchange > 1:
                     loss_binary_1, ent_bin_1 = multistep_loss_binary(
-                        feats_1[0], probs_1[0], rewards_1, r[0][0], FLAGS.entropy_agent1)
+                        feats_1[0], probs_1[0], rewards_1, r[0][0], binary_agent1_masks, FLAGS.entropy_agent1)
                     loss_binary_2, ent_bin_2 = multistep_loss_binary(
-                        feats_2[0], probs_2[0], rewards_2, r[1][0], FLAGS.entropy_agent2)
-                    loss_baseline_1 = multistep_loss_bas(r[0][0], rewards_1)
-                    loss_baseline_2 = multistep_loss_bas(r[1][0], rewards_2)
+                        feats_2[0], probs_2[0], rewards_2, r[1][0], binary_agent2_masks, FLAGS.entropy_agent2)
+                    loss_baseline_1 = multistep_loss_bas(r[0][0], rewards_1, bas_agent1_masks)
+                    loss_baseline_2 = multistep_loss_bas(r[1][0], rewards_2, bas_agent1_masks)
                     ent_agent1_bin = ent_bin_1
                     ent_agent2_bin = ent_bin_2
 

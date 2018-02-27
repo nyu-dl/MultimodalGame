@@ -1169,8 +1169,11 @@ def multistep_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
         # TODO - implement for new agents
         pass
     else:
-        outp = map(lambda feat, prob, scores: calculate_loss_binary(feat, prob, rewards, scores, entropy_penalty),
-                   binary_features, binary_probs, baseline_rewards)
+        # debuglogger.debug(f'Binary features: {binary_features}')
+        # debuglogger.debug(f'Binary probs: {binary_probs}')
+        # debuglogger.debug(f'Baseline rewards: {baseline_rewards}')
+        outp = list(map(lambda feat, prob, scores: calculate_loss_binary(feat, prob, rewards, scores, entropy_penalty),
+                   binary_features, binary_probs, baseline_rewards))
         losses = [o[0] for o in outp]
         entropies = [o[1] for o in outp]
         loss = sum(losses) / len(binary_features)
@@ -1187,8 +1190,8 @@ def multistep_loss_bas(baseline_scores, rewards, masks):
         # TODO - check for new agents
         pass
     else:
-        losses = map(lambda scores: calculate_loss_bas(scores, rewards),
-                     baseline_scores)
+        losses = list(map(lambda scores: calculate_loss_bas(scores, rewards),
+                     baseline_scores))
         loss = sum(losses) / len(baseline_scores)
     return loss
 
@@ -1693,18 +1696,17 @@ def run():
                     ent_agent2_bin = [ent_bin_2]
                 elif FLAGS.max_exchange > 1:
                     loss_binary_1, ent_bin_1 = multistep_loss_binary(
-                        feats_1[0], probs_1[0], rewards_1, r[0][0], binary_agent1_masks, FLAGS.entropy_agent1)
+                        feats_1, probs_1, rewards_1, r[0], binary_agent1_masks, FLAGS.entropy_agent1)
                     loss_binary_2, ent_bin_2 = multistep_loss_binary(
-                        feats_2[0], probs_2[0], rewards_2, r[1][0], binary_agent2_masks, FLAGS.entropy_agent2)
-                    loss_baseline_1 = multistep_loss_bas(r[0][0], rewards_1, bas_agent1_masks)
-                    loss_baseline_2 = multistep_loss_bas(r[1][0], rewards_2, bas_agent1_masks)
+                        feats_2, probs_2, rewards_2, r[1], binary_agent2_masks, FLAGS.entropy_agent2)
+                    loss_baseline_1 = multistep_loss_bas(r[0], rewards_1, bas_agent1_masks)
+                    loss_baseline_2 = multistep_loss_bas(r[1], rewards_2, bas_agent2_masks)
                     ent_agent1_bin = ent_bin_1
                     ent_agent2_bin = ent_bin_2
 
-            debuglogger.info(f'Loss bin 1: {loss_binary_1} bin 2: {loss_binary_2}')
-            debuglogger.info(f'Loss baseline 1: {loss_baseline_1} baseline 2: {loss_baseline_2}')
-            debuglogger.info(f'Entropy bin 1: {ent_agent1_bin} Entropy bin 2: {ent_agent1_bin}')
-            sys.exit()
+            debuglogger.debug(f'Loss bin 1: {loss_binary_1} bin 2: {loss_binary_2}')
+            debuglogger.debug(f'Loss baseline 1: {loss_baseline_1} baseline 2: {loss_baseline_2}')
+            debuglogger.debug(f'Entropy bin 1: {ent_agent1_bin} Entropy bin 2: {ent_agent1_bin}')
 
             if FLAGS.use_binary:
                 loss_agent1 += FLAGS.rl_loss_weight * loss_binary_1

@@ -1164,42 +1164,13 @@ def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
     return loss, negentropy
 
 
-def multistep_loss_binary(binary_features, binary_probs, logs, baseline_scores, masks, entropy_penalty):
-    # TODO - check for new agents
+def multistep_loss_binary(binary_features, binary_probs, rewards, baseline_rewards, masks, entropy_penalty):
     if masks is not None:
-        def mapped_fn(feat, prob, scores, mask, mask_sums):
-            if mask_sums == 0:
-                return Variable(torch.zeros(1))
-
-            feat_size = feat.size()
-            prob_size = prob.size()
-            logs_size = logs.size()
-            scores_size = scores.size()
-
-            feat = feat[mask.expand_as(feat)].view(-1, feat_size[1])
-            prob = prob[mask.expand_as(prob)].view(-1, prob_size[1])
-            _logs = logs[mask.expand_as(logs)].view(-1, logs_size[1])
-            scores = scores[mask.expand_as(scores)].view(-1, scores_size[1])
-            return calculate_loss_binary(feat, prob, _logs, scores, entropy_penalty)
-
-        _mask_sums = [m.float().sum().data[0] for m in masks]
-
-        if FLAGS.debug:
-            assert len(masks) > 0
-            assert len(masks) == len(binary_features)
-            assert len(masks) == len(binary_probs)
-            assert len(masks) == len(baseline_scores)
-            assert sum(_mask_sums) > 0
-
-        outp = map(mapped_fn, binary_features, binary_probs,
-                   baseline_scores, masks, _mask_sums)
-        losses = [o[0] for o in outp]
-        entropies = [o[1] for o in outp]
-        _losses = [l * ms for l, ms in zip(losses, _mask_sums)]
-        loss = sum(_losses) / sum(_mask_sums)
+        # TODO - implement for new agents
+        pass
     else:
-        outp = map(lambda feat, prob, scores: calculate_loss_binary(feat, prob, logs, scores, entropy_penalty),
-                   binary_features, binary_probs, baseline_scores)
+        outp = map(lambda feat, prob, scores: calculate_loss_binary(feat, prob, rewards, scores, entropy_penalty),
+                   binary_features, binary_probs, baseline_rewards)
         losses = [o[0] for o in outp]
         entropies = [o[1] for o in outp]
         loss = sum(losses) / len(binary_features)
@@ -1211,17 +1182,12 @@ def calculate_loss_bas(baseline_scores, rewards):
     return loss_bas
 
 
-def multistep_loss_bas(baseline_scores, logs, masks):
-    # TODO - check for new agents
+def multistep_loss_bas(baseline_scores, rewards, masks):
     if masks is not None:
-        losses = map(lambda scores, mask: calculate_loss_bas(
-            scores[mask].view(-1, 1), logs[mask].view(-1, 1)),
-            baseline_scores, masks)
-        _mask_sums = [m.sum().float() for m in masks]
-        _losses = [l * ms for l, ms in zip(losses, _mask_sums)]
-        loss = sum(_losses) / sum(_mask_sums)
+        # TODO - check for new agents
+        pass
     else:
-        losses = map(lambda scores: calculate_loss_bas(scores, logs),
+        losses = map(lambda scores: calculate_loss_bas(scores, rewards),
                      baseline_scores)
         loss = sum(losses) / len(baseline_scores)
     return loss
@@ -1432,7 +1398,7 @@ def run():
         optimizer_agent1 = optimizers_dict["optimizer_agent1"]
         optimizer_agent2 = optimizers_dict["optimizer_agent2"]
         agent_idxs = [1, 2]
-    
+
     # Alternatives to training.
     if FLAGS.eval_only:
         if not os.path.exists(FLAGS.checkpoint):
@@ -1550,7 +1516,7 @@ def run():
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
             debuglogger.debug(f'Batch {i_batch}')
-            
+
             # Select agents if training with pools
             if FLAGS.agent_pools:
                 idx = random.randint(0, len(agents) - 1)
@@ -1567,7 +1533,7 @@ def run():
                 agent2 = agents[idx]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx + 1)]
                 agent_idxs[1] = idx + 1
-            
+
             # Converted to Variable in get_classification_loss_and_stats
             target = batch["target"]
             im_feats_1 = batch["im_feats_1"]  # Already Variable
@@ -1726,12 +1692,19 @@ def run():
                     ent_agent1_bin = [ent_bin_1]
                     ent_agent2_bin = [ent_bin_2]
                 elif FLAGS.max_exchange > 1:
-                    # TODO
-                    ent_agent1_bin = []
-                    ent_agent2_bin = []
-                    debuglogger.warning(
-                        f'Error: multistep fixed exchange not implemented yet')
-                    sys.exit()
+                    loss_binary_1, ent_bin_1 = multistep_loss_binary(
+                        feats_1[0], probs_1[0], rewards_1, r[0][0], FLAGS.entropy_agent1)
+                    loss_binary_2, ent_bin_2 = multistep_loss_binary(
+                        feats_2[0], probs_2[0], rewards_2, r[1][0], FLAGS.entropy_agent2)
+                    loss_baseline_1 = multistep_loss_bas(r[0][0], rewards_1)
+                    loss_baseline_2 = multistep_loss_bas(r[1][0], rewards_2)
+                    ent_agent1_bin = ent_bin_1
+                    ent_agent2_bin = ent_bin_2
+
+            debuglogger.info(f'Loss bin 1: {loss_binary_1} bin 2: {loss_binary_2}')
+            debuglogger.info(f'Loss baseline 1: {loss_baseline_1} baseline 2: {loss_baseline_2}')
+            debuglogger.info(f'Entropy bin 1: {ent_agent1_bin} Entropy bin 2: {ent_agent1_bin}')
+            sys.exit()
 
             if FLAGS.use_binary:
                 loss_agent1 += FLAGS.rl_loss_weight * loss_binary_1

@@ -1860,7 +1860,7 @@ def run():
             if step % FLAGS.log_dev == 0:
                 # Report in domain development accuracy and checkpoint if best result
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True, analyze_messages=True)
+                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
                 if step >= FLAGS.save_after and total_accuracy_com > best_dev_acc:
                     best_dev_acc = total_accuracy_com
                     flogger.Log(
@@ -1869,6 +1869,9 @@ def run():
                     data = dict(step=step, best_dev_acc=best_dev_acc)
                     torch_save(FLAGS.checkpoint + "_best", data, models_dict,
                                optimizers_dict, gpu=0 if FLAGS.cuda else -1)
+                    # Re-run in domain dev performance and log examples and analyze messages
+                    dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                        agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True, analyze_messages=True)
                 # Report out of domain development accuracy
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
                     agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)

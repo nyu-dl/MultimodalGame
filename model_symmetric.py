@@ -1343,64 +1343,57 @@ def run():
             f.write(json.dumps(FLAGS.FlagValuesDict(), indent=4, sort_keys=True))
 
     # Initialize Agents
-    agent1 = Agent(im_feature_type=FLAGS.img_feat,
-                   im_feat_dim=FLAGS.img_feat_dim,
-                   h_dim=FLAGS.h_dim,
-                   m_dim=FLAGS.m_dim,
-                   desc_dim=FLAGS.desc_dim,
-                   num_classes=FLAGS.num_classes,
-                   s_dim=FLAGS.s_dim,
-                   use_binary=FLAGS.use_binary,
-                   use_attn=FLAGS.visual_attn,
-                   attn_dim=FLAGS.attn_dim,
-                   use_MLP=FLAGS.use_MLP,
-                   cuda=FLAGS.cuda)
+    agents = []
+    optimizers_dict = {}
+    models_dict = {}
 
-    flogger.Log("Agent 1 Architecture: {}".format(agent1))
-    total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
-                        for p in agent1.parameters()])
-    flogger.Log("Total Parameters: {}".format(total_params))
+    # Check agent setup
+    if FLAGS.num_agents < 2:
+        flogger.Log("Only {} agents. There must be at least 2. Set FLAGS.num_agents".format(FLAGS.num_agents))
+        sys.exit()
+    elif FLAGS.num_agents > 2 and not FLAGS.agent_pools:
+        flogger.Log("{} is too many agents. There can only be two if FLAGS.agent_pools is false".format(FLAGS.num_agents))
+        sys.exit()
 
-    agent2 = Agent(im_feature_type=FLAGS.img_feat,
-                   im_feat_dim=FLAGS.img_feat_dim,
-                   h_dim=FLAGS.h_dim,
-                   m_dim=FLAGS.m_dim,
-                   desc_dim=FLAGS.desc_dim,
-                   num_classes=FLAGS.num_classes,
-                   s_dim=FLAGS.s_dim,
-                   use_binary=FLAGS.use_binary,
-                   use_attn=FLAGS.visual_attn,
-                   attn_dim=FLAGS.attn_dim,
-                   use_MLP=FLAGS.use_MLP,
-                   cuda=FLAGS.cuda)
+    for _ in range(FLAGS.num_agents):
+        agent = Agent(im_feature_type=FLAGS.img_feat,
+                      im_feat_dim=FLAGS.img_feat_dim,
+                      h_dim=FLAGS.h_dim,
+                      m_dim=FLAGS.m_dim,
+                      desc_dim=FLAGS.desc_dim,
+                      num_classes=FLAGS.num_classes,
+                      s_dim=FLAGS.s_dim,
+                      use_binary=FLAGS.use_binary,
+                      use_attn=FLAGS.visual_attn,
+                      attn_dim=FLAGS.attn_dim,
+                      use_MLP=FLAGS.use_MLP,
+                      cuda=FLAGS.cuda)
 
-    flogger.Log("Agent 2 Architecture: {}".format(agent2))
-    total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
-                        for p in agent2.parameters()])
-    flogger.Log("Total Parameters: {}".format(total_params))
+        flogger.Log("Agent {} Architecture: {}".format(_ + 1, agent))
+        total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
+                            for p in agent.parameters()])
+        flogger.Log("Total Parameters: {}".format(total_params))
+        agents.append(agent)
 
-    # Optimizer
-    if FLAGS.optim_type == "SGD":
-        optimizer_agent1 = optim.SGD(
-            agent1.parameters(), lr=FLAGS.learning_rate)
-        optimizer_agent2 = optim.SGD(
-            agent2.parameters(), lr=FLAGS.learning_rate)
-    elif FLAGS.optim_type == "Adam":
-        optimizer_agent1 = optim.Adam(
-            agent1.parameters(), lr=FLAGS.learning_rate)
-        optimizer_agent2 = optim.Adam(
-            agent2.parameters(), lr=FLAGS.learning_rate)
-    elif FLAGS.optim_type == "RMSprop":
-        optimizer_agent1 = optim.RMSprop(
-            agent1.parameters(), lr=FLAGS.learning_rate)
-        optimizer_agent2 = optim.RMSprop(
-            agent2.parameters(), lr=FLAGS.learning_rate)
-    else:
-        raise NotImplementedError
+        # Optimizer
+        if FLAGS.optim_type == "SGD":
+            optimizer_agent = optim.SGD(
+                agent.parameters(), lr=FLAGS.learning_rate)
+        elif FLAGS.optim_type == "Adam":
+            optimizer_agent = optim.Adam(
+                agent.parameters(), lr=FLAGS.learning_rate)
+        elif FLAGS.optim_type == "RMSprop":
+            optimizer_agent = optim.RMSprop(
+                agent.parameters(), lr=FLAGS.learning_rate)
+        else:
+            raise NotImplementedError
 
-    optimizers_dict = dict(optimizer_1=optimizer_agent1,
-                           optimizer_2=optimizer_agent2)
-    models_dict = dict(agent1=agent1, agent2=agent2)
+        optim_name = "optimizer_" + str(_ + 1)
+        agent_name = "agent" + str(_ + 1)
+        optimizers_dict[optim_name] = optimizer_agent
+        models_dict[agent_name] = agent
+
+    flogger.Log("Number of agents: {}".format(len(agents)))
 
     # Training metrics
     epoch = 0
@@ -1408,7 +1401,6 @@ def run():
     best_dev_acc = 0
 
     # Optionally load previously saved model
-    # TODO check this works with new models
     if os.path.exists(FLAGS.checkpoint):
         flogger.Log("Loading from: " + FLAGS.checkpoint)
         data = torch_load(FLAGS.checkpoint, models_dict, optimizers_dict)
@@ -1423,6 +1415,15 @@ def run():
             m.cuda()
         for o in optimizers_dict.values():
             recursively_set_device(o.state_dict(), gpu=0)
+
+    # If training / evaluating with pools of agents sample with each batch
+    if FLAGS.agent_pools:
+        agent1 = None
+        agent2 = None
+    # Otherwise keep agents fixed for each batch
+    else:
+        agent1 = agents[0]
+        agent2 = agents[1]
 
     # Alternatives to training.
     if FLAGS.eval_only:
@@ -1452,6 +1453,18 @@ def run():
                                    'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
                                    'total_acc_atl1_com': []  # % at least 1 agent right after comms
                                    }
+
+        # Select agents if training with pools
+        if FLAGS.agent_pools:
+            idx = random.randint(0, len(agents) - 1)
+            flogger.Log("Selection from pool: Agent 1: {}".format(idx))
+            logger.log(key="Selection from pool: Agent 1: ", val=idx, step=step)
+            agent1 = agents[idx]
+            idx = random.randint(0, len(agents) - 1)
+            flogger.Log("Selection from pool: Agent 2: {}".format(idx))
+            logger.log(key="Selection from pool: Agent 2: ", val=idx, step=step)
+            agent2 = agents[idx]
+
         # Report in domain development accuracy and checkpoint if best result
         dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
             agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True, analyze_messages=True)
@@ -1527,6 +1540,17 @@ def run():
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
             debuglogger.debug(f'Batch {i_batch}')
+
+            # Select agents if training with pools
+            if FLAGS.agent_pools:
+                idx = random.randint(0, len(agents) - 1)
+                flogger.Log("Selection from pool: Agent 1: {}".format(idx))
+                logger.log(key="Selection from pool: Agent 1: ", val=idx, step=step)
+                agent1 = agents[idx]
+                idx = random.randint(0, len(agents) - 1)
+                flogger.Log("Selection from pool: Agent 2: {}".format(idx))
+                logger.log(key="Selection from pool: Agent 2: ", val=idx, step=step)
+                agent2 = agents[idx]
 
             # Converted to Variable in get_classification_loss_and_stats
             target = batch["target"]
@@ -1674,7 +1698,7 @@ def run():
                     # TODO - check old use of entropy_s
                     # The receiver might have no z-loss if we stop after first message from sender.
                     debuglogger.warning(
-                        f'Error: multistep fixed exchange not implemented yet')
+                        f'Error: multistep adaptive exchange not implemented yet')
                     sys.exit()
                 elif FLAGS.max_exchange == 1:
                     loss_binary_1, ent_bin_1 = calculate_loss_binary(
@@ -2035,6 +2059,9 @@ def flags():
                           "Whether to randomize the order in which agents communicate")
     gflags.DEFINE_boolean("cooperative_reward", False,
                           "Whether to have a cooperative or individual reward structure")
+    gflags.DEFINE_boolean("agent_pools", False,
+                          "Whether to have a pool of agents to train instead of two fixed agents")
+    gflags.DEFINE_integer("num_agents", 2, "How many agents in the pool")
     # gflags.DEFINE_boolean("ignore_2", False,
     #                       "Agent 1 ignores messages from Agent 2")
     # gflags.DEFINE_boolean("ignore_1", False,

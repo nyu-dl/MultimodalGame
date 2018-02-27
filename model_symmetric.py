@@ -170,11 +170,10 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
                 dists.append((i, j, d))
             if i == len(means) - 2:
                 break
-        #debuglogger.debug(f'Means: {means}')
-        #debuglogger.debug(f'Std: {stds}')
-        #debuglogger.debug(f'Distances: {dists}')
-        logger.log(key=data_type + ": " + s + " message stats: count: ",
-            val=num, step=step)
+        # debuglogger.debug(f'Means: {means}')
+        # debuglogger.debug(f'Std: {stds}')
+        # debuglogger.debug(f'Distances: {dists}')
+        logger.log(key=data_type + ": " + s + " message stats: count: ", val=num, step=step)
         for i in range(len(means)):
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
                        val=means[i], step=step)
@@ -208,8 +207,7 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
                 dists.append((i, j, d))
             if i == len(means) - 2:
                 break
-        logger.log(key=data_type + ": " + s + " message stats: count: ",
-            val=num, step=step)
+        logger.log(key=data_type + ": " + s + " message stats: count: ", val=num, step=step)
         for i in range(len(means)):
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
                        val=means[i], step=step)
@@ -243,25 +241,20 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
                 dists.append((i, j, d))
             if i == len(means) - 2:
                 break
-        logger.log(key=data_type + ": " + s + " message stats: count: ",
-            val=num, step=step)
+        logger.log(key=data_type + ": " + s + " message stats: count: ", val=num, step=step)
         for i in range(len(means)):
-            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
-                           val=means[i], step=step)
-            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ",
-                           val=stds[i], step=step)
-            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape_color {}: count: {}, agent {}: mean: {}, std: {}".format(
-                    epoch, step, i_batch, data_type, s, num, i, means[i], stds[i]))
+            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ", val=means[i], step=step)
+            logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": std: ", val=stds[i], step=step)
+            flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape_color {}: count: {}, agent {}: mean: {}, std: {}".format(epoch, step, i_batch, data_type, s, num, i, means[i], stds[i]))
         for i in range(len(dists)):
             logger.log(key=data_type + ": " + s + " message stats: distances: [" + str(dists[i][0]) + ":" + str(dists[i][1]) + "]: ", val=dists[i][2], step=step)
-        flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape_color {}: dists: {}".format(
-                epoch, step, i_batch, data_type, s, dists))
-    path = FLAGS.log_path + "/" + FLAGS.experiment_name + "_" + data_type + "_message_stats.pkl" 
+        flogger.Log("Epoch: {} Step: {} Batch: {} {} message stats: shape_color {}: dists: {}".format(epoch, step, i_batch, data_type, s, dists))
+    path = FLAGS.log_path + "/" + FLAGS.experiment_name + "_" + data_type + "_message_stats.pkl"
     pickle.dump(message_stats, open(path, "wb"))
     debuglogger.info(f'Saved message stats to log file')
 
 
-def run_analyze_messages(data,  data_type, logger, flogger, epoch, step, i_batch):
+def run_analyze_messages(data, data_type, logger, flogger, epoch, step, i_batch):
     '''Logs the mean and std deviation per set of messages per shape, per color and per shape-color for each message set.
       Additionally logs the distances between the mean message for each agent type per shape, color and shape-color
 
@@ -318,7 +311,7 @@ def run_analyze_messages(data,  data_type, logger, flogger, epoch, step, i_batch
                     for m_i in m[1:]:
                         c_store[c]["count"] += 1
                         c_store[c]["message"].append(m_i.data)
-            
+
             s_c = str(s) + "_" + str(c)
             if s_c in s_c_store:
                 # Potentially multiple exchanges
@@ -337,7 +330,7 @@ def run_analyze_messages(data,  data_type, logger, flogger, epoch, step, i_batch
                 debuglogger.debug(f's_store: {s_store}')
                 debuglogger.debug(f'c_store: {c_store}')
                 debuglogger.debug(f's_c_store: {s_c_store}')
-                #sys.exit()
+                # sys.exit()
             j += 1
         # Calculate and log mean and std_dev
         s_store = calc_message_mean_and_std(s_store)
@@ -359,15 +352,15 @@ def add_data_point(batch, i, data_store, messages_1, messages_2):
     # Add messages from each exchange
     m_1 = []
     for exchange in messages_1:
-        #debuglogger.debug(f'Exchange agent 1: {exchange[i]}')
+        # debuglogger.debug(f'Exchange agent 1: {exchange[i]}')
         m_1.append(exchange[i])
     data_store["msg_1"].append(m_1)
     m_2 = []
     for exchange in messages_2:
-        #debuglogger.debug(f'Exchange agent 2: {exchange[i]}')
+        # debuglogger.debug(f'Exchange agent 2: {exchange[i]}')
         m_2.append(exchange[i])
     data_store["msg_2"].append(m_2)
-    #debuglogger.debug(f'Data store: {data_store}')
+    # debuglogger.debug(f'Data store: {data_store}')
     return data_store
 
 
@@ -696,13 +689,13 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 y=y)
             callback(agent1, agent2, batch, callback_dict)
         # break
-   
+
     if store_examples:
         store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
         store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger)
     if analyze_messages:
         run_analyze_messages(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
-        #run_analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
+        # run_analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
 
     # Print confusion matrix
     true_labels = np.concatenate(true_labels).reshape(-1)

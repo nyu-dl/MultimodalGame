@@ -1369,7 +1369,7 @@ def run():
                       use_MLP=FLAGS.use_MLP,
                       cuda=FLAGS.cuda)
 
-        flogger.Log("Agent {} Architecture: {}".format(_ + 1, agent))
+        flogger.Log("Agent {} id: {} Architecture: {}".format(_ + 1, id(agent), agent))
         total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
                             for p in agent.parameters()])
         flogger.Log("Total Parameters: {}".format(total_params))
@@ -1388,12 +1388,14 @@ def run():
         else:
             raise NotImplementedError
 
-        optim_name = "optimizer_" + str(_ + 1)
+        optim_name = "optimizer_agent" + str(_ + 1)
         agent_name = "agent" + str(_ + 1)
         optimizers_dict[optim_name] = optimizer_agent
         models_dict[agent_name] = agent
 
     flogger.Log("Number of agents: {}".format(len(agents)))
+    for k in optimizers_dict:
+        flogger.Log("Optimizer {}: {}".format(k, optimizers_dict[k]))
 
     # Training metrics
     epoch = 0
@@ -1420,11 +1422,17 @@ def run():
     if FLAGS.agent_pools:
         agent1 = None
         agent2 = None
+        optimizer_agent1 = None
+        optimizer_agent2 = None
+        agent_idxs = [None, None]
     # Otherwise keep agents fixed for each batch
     else:
         agent1 = agents[0]
         agent2 = agents[1]
-
+        optimizer_agent1 = optimizers_dict["optimizer_agent1"]
+        optimizer_agent2 = optimizers_dict["optimizer_agent2"]
+        agent_idxs = [1, 2]
+    
     # Alternatives to training.
     if FLAGS.eval_only:
         if not os.path.exists(FLAGS.checkpoint):
@@ -1460,10 +1468,12 @@ def run():
             flogger.Log("Selection from pool: Agent 1: {}".format(idx))
             logger.log(key="Selection from pool: Agent 1: ", val=idx, step=step)
             agent1 = agents[idx]
+            optimizer_agent1 = optimizers_dict["optimizer_agent" + str(idx + 1)]
             idx = random.randint(0, len(agents) - 1)
             flogger.Log("Selection from pool: Agent 2: {}".format(idx))
             logger.log(key="Selection from pool: Agent 2: ", val=idx, step=step)
             agent2 = agents[idx]
+            optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx + 1)]
 
         # Report in domain development accuracy and checkpoint if best result
         dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
@@ -1540,18 +1550,24 @@ def run():
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
             debuglogger.debug(f'Batch {i_batch}')
-
+            
             # Select agents if training with pools
             if FLAGS.agent_pools:
                 idx = random.randint(0, len(agents) - 1)
-                flogger.Log("Selection from pool: Agent 1: {}".format(idx))
-                logger.log(key="Selection from pool: Agent 1: ", val=idx, step=step)
+                # flogger.Log("Selection from pool: Agent 1: {}".format(idx))
+                # logger.log(key="Selection from pool: Agent 1: ", val=idx, step=step)
                 agent1 = agents[idx]
-                idx = random.randint(0, len(agents) - 1)
-                flogger.Log("Selection from pool: Agent 2: {}".format(idx))
-                logger.log(key="Selection from pool: Agent 2: ", val=idx, step=step)
+                optimizer_agent1 = optimizers_dict["optimizer_agent" + str(idx + 1)]
+                agent_idxs[0] = idx + 1
+                old_idx = idx
+                while idx == old_idx:
+                    idx = random.randint(0, len(agents) - 1)
+                # flogger.Log("Selection from pool: Agent 2: {}".format(idx))
+                # logger.log(key="Selection from pool: Agent 2: ", val=idx, step=step)
                 agent2 = agents[idx]
-
+                optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx + 1)]
+                agent_idxs[1] = idx + 1
+            
             # Converted to Variable in get_classification_loss_and_stats
             target = batch["target"]
             im_feats_1 = batch["im_feats_1"]  # Already Variable
@@ -1755,8 +1771,7 @@ def run():
                     batch_accuracy['total_acc_atl1_com'][-FLAGS.log_interval:]).mean()
 
                 # Log accuracy
-                log_acc = "Epoch: {} Step: {} Batch: {} Training Accuracy:\nBefore comms: Both correct: {} At least 1 correct: {}\nAfter comms: Both correct: {} At least 1 correct: {}".format(
-                    epoch, step, i_batch, avg_batch_acc_total_nc, avg_batch_acc_atl1_nc, avg_batch_acc_total_com, avg_batch_acc_atl1_com)
+                log_acc = "Epoch: {} Step: {} Batch: {} Agent 1: {} Agent 2: {} Training Accuracy:\nBefore comms: Both correct: {} At least 1 correct: {}\nAfter comms: Both correct: {} At least 1 correct: {}".format(epoch, step, i_batch, agent_idxs[0], agent_idxs[1], avg_batch_acc_total_nc, avg_batch_acc_atl1_nc, avg_batch_acc_total_com, avg_batch_acc_atl1_com)
                 flogger.Log(log_acc)
 
                 # Agent1
@@ -1883,6 +1898,9 @@ def run():
             # Report development accuracy
             if step % FLAGS.log_dev == 0:
                 # Report in domain development accuracy and checkpoint if best result
+                log_agents = "Epoch: {} Step: {} Batch: {} Agent 1: {} Agent 2: {}".format(
+                    epoch, step, i_batch, agent_idxs[0], agent_idxs[1])
+                flogger.Log(log_agents)
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
                     agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
                 if step >= FLAGS.save_after and total_accuracy_com > best_dev_acc:

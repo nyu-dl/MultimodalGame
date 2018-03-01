@@ -130,7 +130,7 @@ def store_exemplar_batch(data, data_type, logger, flogger):
 
 
 def calc_message_mean_and_std(m_store):
-    # TODO comments and check
+    '''Calculate the mean and std deviation of messages per agent per shape, color and shape-color combination'''
     for k in m_store:
         msgs = m_store[k]["message"]
         msgs = torch.stack(msgs, dim=0)
@@ -143,6 +143,9 @@ def calc_message_mean_and_std(m_store):
 
 
 def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_batch):
+    ''' Helper function to write the message stats to file and log them to stdout
+     Logs the mean and std deviation per set of messages per shape, per color and per shape-color for each message set.
+      Additionally logs the distances between the mean message for each agent type per shape, color and shape-color'''
     debuglogger.info('Logging message stats')
     shape_colors = []
     for s in SHAPES:
@@ -255,8 +258,8 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
 
 
 def run_analyze_messages(data, data_type, logger, flogger, epoch, step, i_batch):
-    '''Logs the mean and std deviation per set of messages per shape, per color and per shape-color for each message set.
-      Additionally logs the distances between the mean message for each agent type per shape, color and shape-color
+    '''Calculates the mean and std deviation per set of messages per shape, per color and per shape-color for each message set.
+      Additionally caculates the distances between the mean message for each agent type per shape, color and shape-color
 
     data: dictionary containing log of data_type examples
     data_type: flag explaining the type of data
@@ -366,7 +369,7 @@ def add_data_point(batch, i, data_store, messages_1, messages_2):
 
 def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=True, callback=None, store_examples=False, analyze_messages=True):
     """
-    Function computing development accuracy
+    Function computing development accuracy and other metrics
     """
 
     extra = dict()
@@ -740,6 +743,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
 
 
 def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages):
+    '''Logs performance on the dev set'''
     total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
         dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=in_domain_eval, callback=None, store_examples=store_examples, analyze_messages=analyze_messages)
     dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
@@ -1143,6 +1147,7 @@ def get_outp(y, masks):
 
 
 def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewards, entropy_penalty):
+    '''Calculates the reinforcement learning loss on the agent communication vectors'''
     log_p_z = Variable(binary_features.data) * torch.log(binary_probs + 1e-8) + \
         (1 - Variable(binary_features.data)) * \
         torch.log(1 - binary_probs + 1e-8)
@@ -1165,6 +1170,7 @@ def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
 
 
 def multistep_loss_binary(binary_features, binary_probs, rewards, baseline_rewards, masks, entropy_penalty):
+    ''' Same as calculate loss binary but with multiple communications per exchange'''
     if masks is not None:
         # TODO - implement for new agents
         pass
@@ -1172,8 +1178,7 @@ def multistep_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
         # debuglogger.debug(f'Binary features: {binary_features}')
         # debuglogger.debug(f'Binary probs: {binary_probs}')
         # debuglogger.debug(f'Baseline rewards: {baseline_rewards}')
-        outp = list(map(lambda feat, prob, scores: calculate_loss_binary(feat, prob, rewards, scores, entropy_penalty),
-                   binary_features, binary_probs, baseline_rewards))
+        outp = list(map(lambda feat, prob, scores: calculate_loss_binary(feat, prob, rewards, scores, entropy_penalty), binary_features, binary_probs, baseline_rewards))
         losses = [o[0] for o in outp]
         entropies = [o[1] for o in outp]
         loss = sum(losses) / len(binary_features)
@@ -1190,8 +1195,7 @@ def multistep_loss_bas(baseline_scores, rewards, masks):
         # TODO - check for new agents
         pass
     else:
-        losses = list(map(lambda scores: calculate_loss_bas(scores, rewards),
-                     baseline_scores))
+        losses = list(map(lambda scores: calculate_loss_bas(scores, rewards), baseline_scores))
         loss = sum(losses) / len(baseline_scores)
     return loss
 
@@ -1207,6 +1211,14 @@ def bin_to_alpha(binary):
 
 
 def calculate_accuracy(prediction_dist, target, batch_size, top_k):
+    '''Calculates the prediction accuracy using correct@top_k
+       Returns:
+        - accuracy: float
+        - correct: boolean vector of batch_size elements.
+                   1 indicates prediction was correct@top_k
+        - top_1: boolean vector of batch_size elements.
+                   1 indicates prediction was correct (top 1)
+    '''
     assert batch_size == target.size(0)
     target_exp = target.view(-1, 1).expand(batch_size, top_k)
     top_k_ind = torch.from_numpy(
@@ -1409,53 +1421,56 @@ def run():
 
         debuglogger.info("Evaluating on in domain validation set")
         step = i_batch = epoch = 0
-        dev_accuracy_id = {'total_acc_both_nc': [],  # % both agents right before comms
-                           'total_acc_both_com': [],  # % both agents right after comms
-                           'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
-                           'total_acc_atl1_com': []  # % at least 1 agent right after comms
-                           }
 
-        dev_accuracy_ood = {'total_acc_both_nc': [],  # % both agents right before comms
-                            'total_acc_both_com': [],  # % both agents right after comms
-                            'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
-                            'total_acc_atl1_com': []  # % at least 1 agent right after comms
-                            }
-        dev_accuracy_self_com_1 = {'total_acc_both_nc': [],  # % both agents right before comms
-                                   'total_acc_both_com': [],  # % both agents right after comms
-                                   'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
-                                   'total_acc_atl1_com': []  # % at least 1 agent right after comms
-                                   }
-        dev_accuracy_self_com_2 = {'total_acc_both_nc': [],  # % both agents right before comms
-                                   'total_acc_both_com': [],  # % both agents right after comms
-                                   'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
-                                   'total_acc_atl1_com': []  # % at least 1 agent right after comms
-                                   }
+        # Storage for results
+        dev_accuracy_id = []
+        dev_accuracy_ood = []
+        dev_accuracy_self_com = []
+        for i in range(FLAGS.num_agents):
+            dev_accuracy_id.append({'total_acc_both_nc': [],  # % both agents right before comms
+                                    'total_acc_both_com': [],  # % both agents right after comms
+                                    'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                                    'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                                    })
 
-        # Select agents if training with pools
-        if FLAGS.agent_pools:
-            idx = random.randint(0, len(agents) - 1)
-            flogger.Log("Selection from pool: Agent 1: {}".format(idx))
-            logger.log(key="Selection from pool: Agent 1: ", val=idx, step=step)
-            agent1 = agents[idx]
-            optimizer_agent1 = optimizers_dict["optimizer_agent" + str(idx + 1)]
-            idx = random.randint(0, len(agents) - 1)
-            flogger.Log("Selection from pool: Agent 2: {}".format(idx))
-            logger.log(key="Selection from pool: Agent 2: ", val=idx, step=step)
-            agent2 = agents[idx]
-            optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx + 1)]
+            dev_accuracy_ood.append({'total_acc_both_nc': [],  # % both agents right before comms
+                                     'total_acc_both_com': [],  # % both agents right after comms
+                                     'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                                     'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                                     })
+            dev_accuracy_self_com.append({'total_acc_both_nc': [],  # % both agents right before comms
+                                          'total_acc_both_com': [],  # % both agents right after comms
+                                          'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                                          'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                                          })
 
-        # Report in domain development accuracy and checkpoint if best result
-        dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-            agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True, analyze_messages=True)
-        # Report out of domain development accuracy
-        dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-            agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
+        # For the pairs of agents calculate results
+        # Applies to both pools of agents and an agent pair
+        for i in range(FLAGS.num_agents - 1):
+            flogger.Log("Agent 1: {}".format(i + 1))
+            logger.log(key="Agent 1: ", val=i + 1, step=step)
+            agent1 = models_dict["agent" + str(i + 1)]
+            flogger.Log("Agent 2: {}".format(i + 2))
+            logger.log(key="Agent 2: ", val=i + 2, step=step)
+            agent2 = models_dict["agent" + str(i + 2)]
+            if i == 0:
+                # Report in domain development accuracy and analyze messages and store examples
+                dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
+                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=True)
+            else:
+                # Report in domain development accuracy
+                dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
+                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False)
+            # Report out of domain development accuracy
+            dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(
+                agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False)
         # Report in domain development accuracy when agents communicate with themselves
         if step % FLAGS.log_self_com == 0:
-            dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_1, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
-            dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_2, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
+            for i in range(FLAGS.num_agents):
+                agent = models_dict["agent" + str(i + 1)]
+                flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
+                dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
+                    agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
         sys.exit()
     elif FLAGS.binary_only:
         if not os.path.exists(FLAGS.checkpoint):
@@ -1494,6 +1509,7 @@ def run():
                           'agent1_com': [],  # after communicaton
                           'agent2_com': []  # after communicaton
                           }
+
         dev_accuracy_id = {'total_acc_both_nc': [],  # % both agents right before comms
                            'total_acc_both_com': [],  # % both agents right after comms
                            'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
@@ -1505,16 +1521,19 @@ def run():
                             'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
                             'total_acc_atl1_com': []  # % at least 1 agent right after comms
                             }
-        dev_accuracy_self_com_1 = {'total_acc_both_nc': [],  # % both agents right before comms
-                                   'total_acc_both_com': [],  # % both agents right after comms
-                                   'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
-                                   'total_acc_atl1_com': []  # % at least 1 agent right after comms
-                                   }
-        dev_accuracy_self_com_2 = {'total_acc_both_nc': [],  # % both agents right before comms
-                                   'total_acc_both_com': [],  # % both agents right after comms
-                                   'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
-                                   'total_acc_atl1_com': []  # % at least 1 agent right after comms
-                                   }
+        dev_accuracy_id_pairs = []
+        dev_accuracy_self_com = []
+        for i in range(FLAGS.num_agents):
+            dev_accuracy_id_pairs.append({'total_acc_both_nc': [],  # % both agents right before comms
+                                          'total_acc_both_com': [],  # % both agents right after comms
+                                          'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                                          'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                                          })
+            dev_accuracy_self_com.append({'total_acc_both_nc': [],  # % both agents right before comms
+                                          'total_acc_both_com': [],  # % both agents right after comms
+                                          'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
+                                          'total_acc_atl1_com': []  # % at least 1 agent right after comms
+                                          })
 
         # Iterate through batches
         for i_batch, batch in enumerate(dataloader):
@@ -1878,6 +1897,7 @@ def run():
                 flogger.Log(log_agents)
                 dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
                     agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
+
                 if step >= FLAGS.save_after and total_accuracy_com > best_dev_acc:
                     best_dev_acc = total_accuracy_com
                     flogger.Log(
@@ -1887,18 +1907,34 @@ def run():
                     torch_save(FLAGS.checkpoint + "_best", data, models_dict,
                                optimizers_dict, gpu=0 if FLAGS.cuda else -1)
                     # Re-run in domain dev performance and log examples and analyze messages
-                    dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                        agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, "In Domain", epoch, step, i_batch, store_examples=True, analyze_messages=True)
+                    # Also get pairs of results
+                    for i in range(FLAGS.num_agents - 1):
+                        flogger.Log("Agent 1: {}".format(i + 1))
+                        logger.log(key="Agent 1: ", val=i + 1, step=step)
+                        _agent1 = models_dict["agent" + str(i + 1)]
+                        flogger.Log("Agent 2: {}".format(i + 2))
+                        logger.log(key="Agent 2: ", val=i + 2, step=step)
+                        _agent2 = models_dict["agent" + str(i + 2)]
+                        if i == 0:
+                            # Report in domain development accuracy and analyze messages and store examples
+                            dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
+                                _agent1, _agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=True)
+                        else:
+                            # Report in domain development accuracy and checkpoint if best result
+                            dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
+                                agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False)
+
                 # Report out of domain development accuracy
-                dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, "Out of Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
+                dev_accuracy_ood, total_accuracy_com = get_and_log_dev_performance(
+                    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, f'Out of Domain:', epoch, step, i_batch, store_examples=False, analyze_messages=False)
 
             # Report in domain development accuracy when agents communicate with themselves
             if step % FLAGS.log_self_com == 0:
-                dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_1, logger, flogger, "Agent 1 self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
-                dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    agent2, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com_2, logger, flogger, "Agent 2 self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
+                for i in range(FLAGS.num_agents):
+                    agent = models_dict["agent" + str(i + 1)]
+                    flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
+                    dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
+                        agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False)
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:

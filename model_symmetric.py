@@ -476,7 +476,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
         exchange_args["data"] = data
         exchange_args["target"] = target
         exchange_args["desc"] = desc
-        exchange_args["train"] = True
+        exchange_args["train"] = False
         exchange_args["break_early"] = not FLAGS.fixed_exchange
 
         s, message_1, message_2, y_all, r = exchange(
@@ -981,6 +981,7 @@ def exchange(a1, a2, exchange_args):
         debuglogger.warning(f'Data context not supported currently')
         sys.exit()
     else:
+        # debuglogger.info(f'Inside exchange: Train status: {train}, Message: {m_binary}')
         s_1e, m_1e, y_1e, r_1e = agent1(
             data['im_feats_1'],
             m_binary,
@@ -1017,6 +1018,10 @@ def exchange(a1, a2, exchange_args):
 
         # Agent 1's message
         m_1e_binary, m_1e_probs = m_1e
+        # Store last but one communication from agent1 to train with
+        # Last communication is "communication into the void" since the other
+        # agent never gets it.
+        m_binary_1, m_probs_1 = m_1e
 
         # Optionally corrupt agent 1's message
         if corrupt:
@@ -1028,6 +1033,7 @@ def exchange(a1, a2, exchange_args):
             debuglogger.warning(f'Data context not supported currently')
             sys.exit()
         else:
+            # debuglogger.info(f'Inside exchange: Train status: {train}, Message to agent 2: {m_1e_binary}')
             s_2e, m_2e, y_2e, r_2e = agent2(
                 data['im_feats_2'],
                 m_1e_binary,
@@ -1042,12 +1048,14 @@ def exchange(a1, a2, exchange_args):
 
         # Optionally corrupt agent 2's message
         if corrupt:
+            debuglogger.info(f'Corrupting message...')
             m_2e_binary = corrupt_message(corrupt_region, agent2, m_2e_binary)
 
         # Run data through agent 1
         if data_context is not None:
             pass
         else:
+            # debuglogger.info(f'Inside exchange: Train status: {train}, Message to agent 1: {m_2e_binary}')
             s_1e, m_1e, y_1e, r_1e = agent1(
                 data['im_feats_1'],
                 m_2e_binary,
@@ -1056,10 +1064,10 @@ def exchange(a1, a2, exchange_args):
                 use_message,
                 batch_size,
                 train)
-
+        
+        # Store rest of communication and stop information
         s_binary_1, s_prob_1 = s_1e
         s_binary_2, s_prob_2 = s_2e
-        m_binary_1, m_probs_1 = m_1e
         m_binary_2, m_probs_2 = m_2e
 
         # Save for later
@@ -1148,6 +1156,7 @@ def get_outp(y, masks):
 
 def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewards, entropy_penalty):
     '''Calculates the reinforcement learning loss on the agent communication vectors'''
+    # debuglogger.info(f'Inside calc loss binary: Binary features: {binary_features}, binary probs: {binary_probs}')
     log_p_z = Variable(binary_features.data) * torch.log(binary_probs + 1e-8) + \
         (1 - Variable(binary_features.data)) * \
         torch.log(1 - binary_probs + 1e-8)
@@ -1334,6 +1343,9 @@ def run():
         sys.exit()
     elif FLAGS.num_agents > 2 and not FLAGS.agent_pools:
         flogger.Log("{} is too many agents. There can only be two if FLAGS.agent_pools is false".format(FLAGS.num_agents))
+        sys.exit()
+    if not FLAGS.use_binary:
+        flogger.Log("Non binary agent communication not implemented yet. Set FLAGS.use_binary to True")
         sys.exit()
 
     for _ in range(FLAGS.num_agents):
@@ -1694,6 +1706,10 @@ def run():
             loss_agent1 = nll_loss_1
             loss_agent2 = nll_loss_2
 
+            # debuglogger.info(f'feats_1: {feats_1}')
+            # debuglogger.info(f'feats_2: {feats_2}')
+            # debuglogger.info(f'probs_1: {probs_1}')
+            # debuglogger.info(f'probs_2: {probs_2}')
             # If training communication channel
             if FLAGS.use_binary:
                 if not FLAGS.fixed_exchange:

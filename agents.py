@@ -210,13 +210,15 @@ class MessageGenerator(nn.Module):
         if self.use_binary:
             w_probs = F.sigmoid(w_scores)
             if training:
+                # debuglogger.info(f"Training...")
                 probs_ = w_probs.data.cpu().numpy()
                 rand_num = np.random.rand(*probs_.shape)
                 # debuglogger.debug(f'rand_num: {rand_num}')
-                # debuglogger.debug(f'probs: {probs_}')
+                # debuglogger.info(f'probs: {probs_}')
                 w_binary = _Variable(torch.from_numpy(
                     (rand_num < probs_).astype('float32')))
             else:
+                # debuglogger.info(f"Eval mode, rounding...")
                 w_binary = torch.round(w_probs).detach()
             if w_probs.is_cuda:
                 w_binary = w_binary.cuda()
@@ -225,7 +227,7 @@ class MessageGenerator(nn.Module):
         else:
             w_feats = w_scores
             w_probs = None
-
+        # debuglogger.info(f'Message : {w_feats}')
         return w_feats, w_probs
 
 

@@ -1064,7 +1064,7 @@ def exchange(a1, a2, exchange_args):
                 use_message,
                 batch_size,
                 train)
-        
+
         # Store rest of communication and stop information
         s_binary_1, s_prob_1 = s_1e
         s_binary_2, s_prob_2 = s_2e
@@ -2079,6 +2079,8 @@ def flags():
     gflags.DEFINE_integer("random_seed", 7, "")
     gflags.DEFINE_enum(
         "resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")
+    gflags.DEFINE_boolean("improc_from_scratch", False, "Whether to train the image processor from scratch")
+    gflags.DEFINE_integer("image_size", 64, "Width and height in pixels of the images to give to the agents")
 
     # Model settings
     gflags.DEFINE_enum("model_type", None, [

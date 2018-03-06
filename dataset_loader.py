@@ -182,7 +182,10 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
 
         # Upscale images and convert to tensors
         ims = generated['world'][batch_indices]
-        ims = upscale(ims)
+        if FLAGS.improc_from_scratch:
+            ims = downsize(ims, FLAGS.image_size)
+        else:
+            ims = upscale(ims)
         batch['images'] = torch.from_numpy(ims).float().permute(0, 3, 1, 2)
 
         # Extract target and texts
@@ -213,9 +216,10 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         # debuglogger.debug(f'p: {batch["p"]}')
 
         # Mask images
+        debuglogger.debug(f'Image dims: {batch["images"].shape}')
         (bs, ch, width, height) = batch['images'].shape
         mask = torch.ones(bs, ch, width, height)
-        cutoffs = (width * batch["p"]).int().clamp(0, 226).numpy().tolist()
+        cutoffs = (width * batch["p"]).int().clamp(0, width - 1).numpy().tolist()
         debuglogger.debug(f'cutoffs: {cutoffs}')
         for i_c, c in enumerate(cutoffs):
             mask[i_c, :, :, c:] = 0
@@ -239,17 +243,23 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         if cuda:
             m_im_1 = m_im_1.cuda()
             m_im_2 = m_im_2.cuda()
-        batch["im_feats_1"] = (model(m_im_1, request=img_feats)[0]).detach()
-        batch["im_feats_2"] = (model(m_im_2, request=img_feats)[0]).detach()
+        if FLAGS.improc_from_scratch:
+            batch["im_feats_1"] = None
+            batch["im_feats_2"] = None
+        else:
+            batch["im_feats_1"] = (model(m_im_1, request=img_feats)[0]).detach()
+            batch["im_feats_2"] = (model(m_im_2, request=img_feats)[0]).detach()
         yield batch
 
 
 if __name__ == "__main__":
     # Settings
     gflags.DEFINE_enum("resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")
+    gflags.DEFINE_boolean("improc_from_scratch", False, "Whether to train the image processor from scratch")
+    gflags.DEFINE_integer("image_size", 64, "Width and height in pixels of the images to give to the agents")
     FLAGS(sys.argv)
 
-    data_path = './ShapeWorld/data/oneshape_simple_textselect'
+    data_path = './data/oneshape_simple_textselect'
     embed_path = './glove.6B/glove.6B.100d.txt'
     mode = 'train'
     size = 100

@@ -44,6 +44,15 @@ def upscale(ims):
     return new_ims
 
 
+def downsize(ims, size):
+    '''Downsizes images'''
+    (bs, width, height, ch) = ims.shape
+    new_ims = np.zeros((bs, size, size, 3))
+    for i in range(bs):
+        new_ims[i] = resize(ims[i], (size, size))
+    return new_ims
+
+
 def convert_texts(texts, word_dict=None):
     ''' Takes a dataset of n texts per example. Each example is a list of strings
     Returns: texts converted to lists of ints
@@ -109,7 +118,12 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
                   "p": p,
                   "texts_str": natural_lang_desc_texts,
                   "texts_vec": texts_vec,
+                  "texts_int": texts_int,
+                  "texts_extra": texts_extra,
                   "target": targets,
+                  "shapes": shapes,
+                  "colors": colors,
+                  "caption_str": caption_str,
         }
 
     im_feats_1: image features for agent 1
@@ -122,6 +136,9 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
     texts_vec: vector representation of the set of natural language image descriptions for each example
     texts_extra: dict for individual word vectors for each description for each example and their corresponding lengths
     target: index of correct textual description
+    shapes: shape of the object in the correct caption, None if there is no explicit shape in the caption
+    colors: color of the object in the correct caption, None if there is no explicit color in the caption
+    caption_str: correct natural language description of the image
     """
     # Read data
     debuglogger.info(f'Reading in dataset...')

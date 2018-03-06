@@ -2090,7 +2090,6 @@ def flags():
                        "layer4_2", "avgpool_512", "fc"], "Specify which layer output to use as image")
     gflags.DEFINE_enum("data_context", "fc", [
                        "fc"], "Specify which layer output to use as context for attention")
-    # gflags.DEFINE_enum("sender_mix", "sum", ["sum", "prod", "mou"], "")
     gflags.DEFINE_integer("img_feat_dim", 512,
                           "Dimension of the image features")
     gflags.DEFINE_integer(
@@ -2110,16 +2109,7 @@ def flags():
     gflags.DEFINE_boolean("agent_pools", False,
                           "Whether to have a pool of agents to train instead of two fixed agents")
     gflags.DEFINE_integer("num_agents", 2, "How many agents in the pool")
-    # gflags.DEFINE_boolean("ignore_2", False,
-    #                       "Agent 1 ignores messages from Agent 2")
-    # gflags.DEFINE_boolean("ignore_1", False,
-    #                       "Agent 2 ignores messages from Agent 1")
-    # gflags.DEFINE_boolean("block_y", True, "Halt gradient flow through description scores")
     gflags.DEFINE_float("first_msg", 0, "Value to fill the first message with")
-    # gflags.DEFINE_float("flipout_1", None, "Dropout for bit flipping")
-    # gflags.DEFINE_float("flipout_2", None, "Dropout for bit flipping")
-    # gflags.DEFINE_boolean("flipout_dev", False, "Dropout for bit flipping")
-    # gflags.DEFINE_boolean("s_prob_prod", True, "Simulate sampling during test time")
     gflags.DEFINE_boolean("visual_attn", False, "agents attends over image")
     gflags.DEFINE_boolean(
         "use_MLP", False, "use MLP to generate prediction scores")

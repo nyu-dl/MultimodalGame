@@ -2079,8 +2079,9 @@ def flags():
     gflags.DEFINE_integer("random_seed", 7, "")
     gflags.DEFINE_enum(
         "resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")
-    gflags.DEFINE_boolean("improc_from_scratch", False, "Whether to train the image processor from scratch")
-    gflags.DEFINE_integer("image_size", 64, "Width and height in pixels of the images to give to the agents")
+    gflags.DEFINE_boolean("improc_from_scratch", True, "Whether to train the image processor from scratch")
+    gflags.DEFINE_integer("image_size", 128, "Width and height in pixels of the images to give to the agents")
+    gflags.DEFINE_boolean("vertical_mask", False, "Whether to just use a vertical mask on images. Otherwise the mask is random")
 
     # Model settings
     gflags.DEFINE_enum("model_type", None, [

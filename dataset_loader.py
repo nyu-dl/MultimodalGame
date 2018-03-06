@@ -7,12 +7,14 @@ import pprint
 import string
 import gflags
 import numpy as np
+import copy
 
 from torchvision.utils import save_image
 from torch.autograd import Variable
 from skimage.transform import resize
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
+from PIL import Image, ImageDraw
 
 from shapeworld import dataset
 from misc import embed, cbow_general
@@ -51,6 +53,65 @@ def downsize(ims, size):
     for i in range(bs):
         new_ims[i] = resize(ims[i], (size, size))
     return new_ims
+
+
+def generate_random_points(width, height):
+    # print(width, height)
+    pts = np.random.randint(0, width + height, 2)
+    # print(pts)
+    if pts[0] >= height:
+        pt1 = (pts[0] - height, 0)
+    else:
+        pt1 = (0, pts[0])
+    if pts[1] >= width:
+        pt2 = (width - 1, pts[1] - width)
+    else:
+        pt2 = (pts[1], height - 1)
+    # print(pt1, pt2)
+    return (pt1, pt2)
+
+
+def get_points_for_masks(pt1, pt2, width, height):
+    A = (0, height - 1)
+    B = (width - 1, height - 1)
+    C = (0, 0)
+    D = (width - 1, 0)
+    if pt1[0] != 0:
+        if pt2[1] == height - 1:
+            points_im1 = [A, C, pt1, pt2]
+            points_im2 = [pt1, pt2, B, D]
+        else:
+            points_im1 = [A, C, pt1, pt2, B]
+            points_im2 = [pt1, pt2, D]
+    else:
+        if pt2[1] == height - 1:
+            points_im1 = [A, pt1, pt2]
+            points_im2 = [pt1, C, D, B, pt2]
+        else:
+            points_im1 = [A, pt1, pt2, B]
+            points_im2 = [pt1, C, D, pt2]
+    return (points_im1, points_im2)
+
+
+def generate_mask(real_image):
+    (ch, width, height) = real_image.shape
+    save_image(real_image, 'test_before.png')
+    real_image = real_image.permute(1, 2, 0)
+    image = np.zeros((real_image.size(0), real_image.size(1), real_image.size(2)))
+    # Convert to PIL
+    im = Image.fromarray(image.astype('uint8') * 255, mode='RGB')
+    im.save('pil_test.png')
+    # Generate mask
+    pt1, pt2 = generate_random_points(width, height)
+    points_im1, points_im2 = get_points_for_masks(pt1, pt2, width, height)
+    masked_im_1 = copy.deepcopy(im)
+    draw = ImageDraw.Draw(masked_im_1)
+    draw.polygon(points_im1, fill="white")
+    # masked_im_1.save('pil_mask1_test.png')
+    mask = torch.from_numpy(np.array(masked_im_1, dtype=np.uint8).astype(float))
+    mask /= mask.max()
+    mask = mask.permute(2, 0, 1)
+    return mask
 
 
 def convert_texts(texts, word_dict=None):
@@ -219,12 +280,19 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         debuglogger.debug(f'Image dims: {batch["images"].shape}')
         (bs, ch, width, height) = batch['images'].shape
         mask = torch.ones(bs, ch, width, height)
-        cutoffs = (width * batch["p"]).int().clamp(0, width - 1).numpy().tolist()
-        debuglogger.debug(f'cutoffs: {cutoffs}')
-        for i_c, c in enumerate(cutoffs):
-            mask[i_c, :, :, c:] = 0
+        # Vertical mask
+        if FLAGS.vertical_mask:
+            cutoffs = (width * batch["p"]).int().clamp(0, width - 1).numpy().tolist()
+            debuglogger.debug(f'cutoffs: {cutoffs}')
+            for i_c, c in enumerate(cutoffs):
+                mask[i_c, :, :, c:] = 0
+        else:
+            # Random mask
+            for i_m in range(bs):
+                mask[i_m] = generate_mask(batch['images'][i_m])
         batch['masked_im_1'] = torch.mul(mask, batch['images']) + (1 - mask)
         batch['masked_im_2'] = torch.mul(1 - mask, batch['images']) + mask
+
         if i == 0:
             # Save example batch
             save_image(batch['images'], data_path + '/example_ims_orig.png', pad_value=0.5)
@@ -255,8 +323,9 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
 if __name__ == "__main__":
     # Settings
     gflags.DEFINE_enum("resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")
-    gflags.DEFINE_boolean("improc_from_scratch", False, "Whether to train the image processor from scratch")
-    gflags.DEFINE_integer("image_size", 64, "Width and height in pixels of the images to give to the agents")
+    gflags.DEFINE_boolean("improc_from_scratch", True, "Whether to train the image processor from scratch")
+    gflags.DEFINE_boolean("vertical_mask", False, "Whether to just use a vertical mask on images. Otherwise the mask is random")
+    gflags.DEFINE_integer("image_size", 128, "Width and height in pixels of the images to give to the agents")
     FLAGS(sys.argv)
 
     data_path = './data/oneshape_simple_textselect'
@@ -265,12 +334,12 @@ if __name__ == "__main__":
     size = 100
     ds_type = 'agreement'
     name = 'oneshape_simple_textselect'
-    batch_size = 8
+    batch_size = 16
     random_seed = 12
     img_feats = 'avgpool_512'
     shuffle = True
     cuda = False
     dataloader = load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, batch_size, random_seed, shuffle, img_feats, cuda, truncate_final_batch=False)
     for i_batch, batch in enumerate(dataloader):
-        pprint.pprint(batch)
+        # pprint.pprint(batch)
         break

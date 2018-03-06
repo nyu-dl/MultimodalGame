@@ -1360,7 +1360,8 @@ def run():
                       use_attn=FLAGS.visual_attn,
                       attn_dim=FLAGS.attn_dim,
                       use_MLP=FLAGS.use_MLP,
-                      cuda=FLAGS.cuda)
+                      cuda=FLAGS.cuda,
+                      im_from_scratch=FLAGS.improc_from_scratch)
 
         flogger.Log("Agent {} id: {} Architecture: {}".format(_ + 1, id(agent), agent))
         total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)

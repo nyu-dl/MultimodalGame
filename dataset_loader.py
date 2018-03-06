@@ -323,7 +323,7 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
 if __name__ == "__main__":
     # Settings
     gflags.DEFINE_enum("resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")
-    gflags.DEFINE_boolean("improc_from_scratch", True, "Whether to train the image processor from scratch")
+    gflags.DEFINE_boolean("improc_from_scratch", False, "Whether to train the image processor from scratch")
     gflags.DEFINE_boolean("vertical_mask", False, "Whether to just use a vertical mask on images. Otherwise the mask is random")
     gflags.DEFINE_integer("image_size", 128, "Width and height in pixels of the images to give to the agents")
     FLAGS(sys.argv)

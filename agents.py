@@ -121,6 +121,71 @@ class ImageProcessor(nn.Module):
         return h_i
 
 
+class ImageProcessorFromScratch(nn.Module):
+    '''Processes an agent's image, with or without attention'''
+
+    def __init__(self, im_dim, hid_dim, use_attn, attn_dim):
+        super(ImageProcessorFromScratch, self).__init__()
+        self.im_dim = im_dim
+        self.hid_dim = hid_dim
+        self.use_attn = use_attn
+        self.attn_dim = attn_dim
+        self.conv_layers = self.build_conv_layers()
+        self.flat_dim = self.get_conv_output_size()
+        self.dense_layer = nn.Linear(self.flat_dim, hid_dim)
+        self.attn_scores = []
+        self.reset_parameters()
+
+    def build_conv_layers(self):
+        conv_layers = []
+        conv_layers += [nn.Conv2d(3, 16, kernel_size=5, stride=2)]
+        conv_layers += [nn.BatchNorm2d(16)]
+        conv_layers += [nn.ReLU(inplace=True)]
+        conv_layers += [nn.Conv2d(16, 16, kernel_size=5, stride=2)]
+        conv_layers += [nn.BatchNorm2d(16)]
+        conv_layers += [nn.ReLU(inplace=True)]
+        conv_layers += [nn.Conv2d(16, 32, kernel_size=5, stride=2)]
+        conv_layers += [nn.BatchNorm2d(32)]
+        conv_layers += [nn.ReLU(inplace=True)]
+        return nn.Sequential(*conv_layers)
+
+    def get_conv_output_size(self):
+        x = Variable(torch.ones(1, *self.im_dim))
+        x = self.conv_layers(x)
+        return x.numel()
+
+    def reset_parameters(self):
+        reset_parameters_util(self)
+
+    def reset_state(self):
+        # Used for debugging.
+        self.attn_scores = []
+
+    def forward(self, x, h_z, t):
+        '''
+        x = x or image_attn(x)
+            Image Attention (https://arxiv.org/pdf/1502.03044.pdf):
+                \beta_i = U tanh(W_r h_z + W_x x_i)
+                \alpha = 1 / |x|        if t == 0
+                \alpha = softmax(\beta) otherwise
+                x = \sum_i \alpha x_i
+        Returns
+            h_i = im_transform(x)
+        '''
+        debuglogger.debug(f'Inside image processing...')
+        batch_size = x.size(0)
+        if self.use_attn:
+            debuglogger.warn(f'Not implemented yet')
+            sys.exit()
+        else:
+            _x = x
+        # Transform image to hid_dim shape
+        _x = self.conv_layers(_x)
+        _x = _x.view(batch_size, -1)
+        h_i = F.relu(self.dense_layer(_x))
+        return h_i
+
+
 class TextProcessor(nn.Module):
     '''Processes sentence representations to the correct hidden dimension'''
 
@@ -265,7 +330,8 @@ class Agent(nn.Module):
                  use_attn,
                  attn_dim,
                  use_MLP,
-                 cuda):
+                 cuda,
+                 im_from_scratch):
         super(Agent, self).__init__()
         self.im_feature_type = im_feature_type
         self.im_feat_dim = im_feat_dim
@@ -279,8 +345,12 @@ class Agent(nn.Module):
         self.use_MLP = use_MLP
         self.attn_dim = attn_dim
         self.use_cuda = cuda
-        self.image_processor = ImageProcessor(
-            im_feat_dim, h_dim, use_attn, attn_dim)
+        if im_from_scratch:
+            self.image_processor = ImageProcessorFromScratch(
+                im_feat_dim, h_dim, use_attn, attn_dim)
+        else:
+            self.image_processor = ImageProcessor(
+                im_feat_dim, h_dim, use_attn, attn_dim)
         self.text_processor = TextProcessor(desc_dim, h_dim)
         self.message_processor = MessageProcessor(m_dim, h_dim, cuda)
         self.message_generator = MessageGenerator(m_dim, h_dim, use_binary)

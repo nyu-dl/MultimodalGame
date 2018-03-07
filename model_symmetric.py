@@ -1368,7 +1368,7 @@ def run():
                             for p in agent.parameters()])
         flogger.Log("Total Parameters: {}".format(total_params))
         agents.append(agent)
-
+        
         # Optimizer
         if FLAGS.optim_type == "SGD":
             optimizer_agent = optim.SGD(

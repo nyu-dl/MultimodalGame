@@ -126,7 +126,7 @@ class ImageProcessorFromScratch(nn.Module):
 
     def __init__(self, im_dim, hid_dim, use_attn, attn_dim):
         super(ImageProcessorFromScratch, self).__init__()
-        self.im_dim = im_dim
+        self.im_dim = (3, im_dim, im_dim)
         self.hid_dim = hid_dim
         self.use_attn = use_attn
         self.attn_dim = attn_dim
@@ -147,10 +147,16 @@ class ImageProcessorFromScratch(nn.Module):
         conv_layers += [nn.Conv2d(16, 32, kernel_size=5, stride=2)]
         conv_layers += [nn.BatchNorm2d(32)]
         conv_layers += [nn.ReLU(inplace=True)]
+        conv_layers += [nn.Conv2d(32, 32, kernel_size=5, stride=2)]
+        conv_layers += [nn.BatchNorm2d(32)]
+        conv_layers += [nn.ReLU(inplace=True)]
+        conv_layers += [nn.Conv2d(32, 32, kernel_size=3, stride=2)]
+        conv_layers += [nn.BatchNorm2d(32)]
+        conv_layers += [nn.ReLU(inplace=True)]
         return nn.Sequential(*conv_layers)
 
     def get_conv_output_size(self):
-        x = Variable(torch.ones(1, *self.im_dim))
+        x = _Variable(torch.ones(1, *self.im_dim))
         x = self.conv_layers(x)
         return x.numel()
 

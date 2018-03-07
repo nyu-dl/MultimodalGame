@@ -312,8 +312,8 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
             m_im_1 = m_im_1.cuda()
             m_im_2 = m_im_2.cuda()
         if FLAGS.improc_from_scratch:
-            batch["im_feats_1"] = None
-            batch["im_feats_2"] = None
+            batch["im_feats_1"] = m_im_1
+            batch["im_feats_2"] = m_im_2
         else:
             batch["im_feats_1"] = (model(m_im_1, request=img_feats)[0]).detach()
             batch["im_feats_2"] = (model(m_im_2, request=img_feats)[0]).detach()

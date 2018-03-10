@@ -1361,14 +1361,15 @@ def run():
                       attn_dim=FLAGS.attn_dim,
                       use_MLP=FLAGS.use_MLP,
                       cuda=FLAGS.cuda,
-                      im_from_scratch=FLAGS.improc_from_scratch)
+                      im_from_scratch=FLAGS.improc_from_scratch,
+                      dropout=FLAGS.dropout)
 
         flogger.Log("Agent {} id: {} Architecture: {}".format(_ + 1, id(agent), agent))
         total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
                             for p in agent.parameters()])
         flogger.Log("Total Parameters: {}".format(total_params))
         agents.append(agent)
-        
+
         # Optimizer
         if FLAGS.optim_type == "SGD":
             optimizer_agent = optim.SGD(
@@ -2117,6 +2118,7 @@ def flags():
     gflags.DEFINE_integer("attn_dim", 256, "")
     gflags.DEFINE_boolean("attn_extra_context", False, "")
     gflags.DEFINE_integer("attn_context_dim", 4096, "")
+    gflags.DEFINE_float("dropout", 0.3, "How much dropout to apply when training using the original image")
     gflags.DEFINE_boolean("desc_attn", False, "agents attend over text")
     gflags.DEFINE_integer("desc_attn_dim", 64, "text attention dim")
     gflags.DEFINE_integer("top_k_dev", 3, "Top-k error in development")

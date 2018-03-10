@@ -124,41 +124,27 @@ class ImageProcessor(nn.Module):
 class ImageProcessorFromScratch(nn.Module):
     '''Processes an agent's image, with or without attention'''
 
-    def __init__(self, im_dim, hid_dim, use_attn, attn_dim):
+    def __init__(self, im_dim, hid_dim, use_attn, attn_dim, dropout):
         super(ImageProcessorFromScratch, self).__init__()
         self.im_dim = (3, im_dim, im_dim)
         self.hid_dim = hid_dim
         self.use_attn = use_attn
         self.attn_dim = attn_dim
-        self.conv_layers = self.build_conv_layers()
-        self.flat_dim = self.get_conv_output_size()
-        self.dense_layer = nn.Linear(self.flat_dim, hid_dim)
+        self.dropout = dropout
+        self.model = self.build_model()
         self.attn_scores = []
         self.reset_parameters()
 
-    def build_conv_layers(self):
-        conv_layers = []
-        conv_layers += [nn.Conv2d(3, 16, kernel_size=5, stride=2)]
-        conv_layers += [nn.BatchNorm2d(16)]
-        conv_layers += [nn.ReLU(inplace=True)]
-        conv_layers += [nn.Conv2d(16, 16, kernel_size=5, stride=2)]
-        conv_layers += [nn.BatchNorm2d(16)]
-        conv_layers += [nn.ReLU(inplace=True)]
-        conv_layers += [nn.Conv2d(16, 32, kernel_size=5, stride=2)]
-        conv_layers += [nn.BatchNorm2d(32)]
-        conv_layers += [nn.ReLU(inplace=True)]
-        conv_layers += [nn.Conv2d(32, 32, kernel_size=5, stride=2)]
-        conv_layers += [nn.BatchNorm2d(32)]
-        conv_layers += [nn.ReLU(inplace=True)]
-        conv_layers += [nn.Conv2d(32, 32, kernel_size=3, stride=2)]
-        conv_layers += [nn.BatchNorm2d(32)]
-        conv_layers += [nn.ReLU(inplace=True)]
-        return nn.Sequential(*conv_layers)
-
-    def get_conv_output_size(self):
-        x = _Variable(torch.ones(1, *self.im_dim))
-        x = self.conv_layers(x)
-        return x.numel()
+    def build_model(self):
+        layers = []
+        layers += [nn.Conv2d(3, 32, kernel_size=5, stride=2)]
+        layers += [nn.BatchNorm2d(32)]
+        layers += [nn.ReLU(inplace=True)]
+        layers += [nn.Conv2d(32, self.hid_dim, kernel_size=5, stride=2)]
+        layers += [nn.BatchNorm2d(self.hid_dim)]
+        layers += [nn.ReLU(inplace=True)]
+        layers += [nn.Dropout2d(p=self.dropout)]
+        return nn.Sequential(*layers)
 
     def reset_parameters(self):
         reset_parameters_util(self)
@@ -185,10 +171,11 @@ class ImageProcessorFromScratch(nn.Module):
             sys.exit()
         else:
             _x = x
-        # Transform image to hid_dim shape
-        _x = self.conv_layers(_x)
+        _x = self.model(_x)
+        h, w = _x.size(2), _x.size(3)
+        _x = nn.functional.avg_pool2d(_x, (h, w))
         _x = _x.view(batch_size, -1)
-        h_i = F.relu(self.dense_layer(_x))
+        h_i = F.relu(_x)
         return h_i
 
 
@@ -337,7 +324,8 @@ class Agent(nn.Module):
                  attn_dim,
                  use_MLP,
                  cuda,
-                 im_from_scratch):
+                 im_from_scratch,
+                 dropout):
         super(Agent, self).__init__()
         self.im_feature_type = im_feature_type
         self.im_feat_dim = im_feat_dim
@@ -353,7 +341,7 @@ class Agent(nn.Module):
         self.use_cuda = cuda
         if im_from_scratch:
             self.image_processor = ImageProcessorFromScratch(
-                im_feat_dim, h_dim, use_attn, attn_dim)
+                im_feat_dim, h_dim, use_attn, attn_dim, dropout)
         else:
             self.image_processor = ImageProcessor(
                 im_feat_dim, h_dim, use_attn, attn_dim)
@@ -545,7 +533,7 @@ if __name__ == "__main__":
     print("Testing agent init and forward pass...")
     im_feature_type = ""
     im_feat_dim = 128
-    h_dim = 4
+    h_dim = 64
     m_dim = 6
     desc_dim = 100
     num_classes = 3
@@ -556,6 +544,10 @@ if __name__ == "__main__":
     attn_dim = 128
     batch_size = 8
     training = True
+    dropout = 0.3
+    use_MLP = False
+    cuda = False
+    im_from_scratch = True
     agent = Agent(im_feature_type,
                   im_feat_dim,
                   h_dim,
@@ -565,9 +557,13 @@ if __name__ == "__main__":
                   s_dim,
                   use_binary,
                   use_attn,
-                  attn_dim)
+                  attn_dim,
+                  use_MLP,
+                  cuda,
+                  im_from_scratch,
+                  dropout)
     print(agent)
-    x = _Variable(torch.ones(batch_size, im_feat_dim))
+    x = _Variable(torch.ones(batch_size, 3, im_feat_dim, im_feat_dim))
     m = _Variable(torch.ones(batch_size, m_dim))
     desc = _Variable(torch.ones(batch_size, num_classes, desc_dim))
 

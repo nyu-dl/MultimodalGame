@@ -465,6 +465,7 @@ class Agent(nn.Module):
         debuglogger.debug(f'Input sizes...')
         debuglogger.debug(f'x: {x.size()}')
         debuglogger.debug(f'm: {m.size()}')
+        debuglogger.debug(f'm: {m}')
         debuglogger.debug(f'desc: {desc.size()}')
 
         # Initialize hidden state if necessary

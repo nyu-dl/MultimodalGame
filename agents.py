@@ -140,9 +140,13 @@ class ImageProcessorFromScratch(nn.Module):
         layers += [nn.Conv2d(3, 32, kernel_size=5, stride=2)]
         layers += [nn.BatchNorm2d(32)]
         layers += [nn.ReLU(inplace=True)]
-        layers += [nn.Conv2d(32, self.hid_dim, kernel_size=5, stride=2)]
-        layers += [nn.BatchNorm2d(self.hid_dim)]
+        layers += [nn.Dropout2d(p=self.dropout)]
+        layers += [nn.Conv2d(32, 64, kernel_size=5, stride=2)]
+        layers += [nn.BatchNorm2d(64)]
         layers += [nn.ReLU(inplace=True)]
+        layers += [nn.Conv2d(64, self.hid_dim, kernel_size=5, stride=2)]
+        layers += [nn.BatchNorm2d(self.hid_dim)]
+        # layers += [nn.ReLU(inplace=True)]
         layers += [nn.Dropout2d(p=self.dropout)]
         return nn.Sequential(*layers)
 

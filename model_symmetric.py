@@ -356,18 +356,17 @@ def add_data_point(batch, i, data_store, messages_1, messages_2, probs_1, probs_
     m_1 = []
     p_1 = []
     for exchange, prob in zip(messages_1, probs_1):
-        m_1.append(exchange[i])
-        p_1.append(prob[i])
+        m_1.append(exchange[i].data.cpu())
+        p_1.append(prob[i].data.cpu())
     data_store["msg_1"].append(m_1)
     data_store["probs_1"].append(p_1)
     m_2 = []
     p_2 = []
     for exchange, prob in zip(messages_2, probs_2):
-        m_2.append(exchange[i])
-        p_2.append(prob[i])
+        m_2.append(exchange[i].data.cpu())
+        p_2.append(prob[i].data.cpu())
     data_store["msg_2"].append(m_2)
     data_store["probs_2"].append(p_2)
-    # debuglogger.debug(f'Data store: {data_store}')
     return data_store
 
 
@@ -695,10 +694,15 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 correct_to_analyze = add_data_point(batch, _i, correct_to_analyze, feats_1, feats_2, probs_1, probs_2)
             else:
                 incorrect_to_analyze = add_data_point(batch, _i, incorrect_to_analyze, feats_1, feats_2, probs_1, probs_2)
-
-        # debuglogger.debug(f'shapes dict: {shapes_accuracy}')
-        # debuglogger.debug(f'colors dict: {colors_accuracy}')
-
+            if _i == 5:
+                debuglogger.debug(f'Message 1: {feats_1}, probs 1: {probs_1}')
+                debuglogger.debug(f'Message 2: {feats_2}, probs 2: {probs_2}')
+                debuglogger.debug(f'Correct dict: {correct_to_analyze}')
+                debuglogger.debug(f'Incorrect dict: {incorrect_to_analyze}')
+        
+        debuglogger.debug(f'shapes dict: {shapes_accuracy}')
+        debuglogger.debug(f'colors dict: {colors_accuracy}')
+        
         # Keep track of conversation lengths
         # TODO not relevant yet
         conversation_lengths_1 += torch.cat(s_feats_1,
@@ -745,12 +749,15 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
             callback(agent1, agent2, batch, callback_dict)
         # break
 
+    debuglogger.info(f'Finishing iterating through dev set, storing examples...')
     if store_examples:
         store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
         store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger)
+    debuglogger.info(f'Analyzing messages...')
     if analyze_messages:
         run_analyze_messages(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
         # run_analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
+    debuglogger.info(f'Saving messages...')
     if save_messages:
         save_messages_and_stats(correct_to_analyze, incorrect_to_analyze, agent_tag)
 
@@ -799,7 +806,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
 def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag):
     '''Logs performance on the dev set'''
     total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
-        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=in_domain_eval, callback=None, store_examples=store_examples, analyze_messages=analyze_messages, save_messages=save_messages, agent_tab=agent_tag)
+        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=in_domain_eval, callback=None, store_examples=store_examples, analyze_messages=analyze_messages, save_messages=save_messages, agent_tag=agent_tag)
     dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
     dev_accuracy_log['total_acc_both_com'].append(total_accuracy_com)
     dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
@@ -1530,8 +1537,8 @@ def run():
                 dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
                     agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
             # Report out of domain development accuracy
-            dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(
-                agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False)
+            #dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(
+            #    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
         # Report in domain development accuracy when agents communicate with themselves
         if step % FLAGS.log_self_com == 0:
             for i in range(FLAGS.num_agents):

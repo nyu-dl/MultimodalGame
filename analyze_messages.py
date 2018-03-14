@@ -10,6 +10,7 @@ import sys
 
 SHAPES = ['circle', 'cross', 'ellipse', 'pentagon', 'rectangle', 'semicircle', 'square', 'triangle']
 COLORS = ['blue', 'cyan', 'gray', 'green', 'magenta', 'red', 'yellow']
+OUTOFDOMAIN = [('square', 'red'), ('triangle', 'green'), ('circle', 'blue'), ('rectangle', 'yellow'), ('cross', 'magenta'), ('ellipse', 'cyan')]
 
 
 def convert_tensor_to_string(message):
@@ -19,7 +20,6 @@ def convert_tensor_to_string(message):
     m_str = ""
     for i in range(m_len):
         m_str += "0" if message[i] == 0 else "1"
-    # print(f'Message: {message}, string: {m_str}')
     return m_str
 
 
@@ -219,14 +219,6 @@ def count_blanks(data, blank_m1, blank_m2):
                     counts['00']['correct'] += 1
                 else:
                     counts['00']['incorrect'] += 1
-    # counts['01']['correct_p'] = counts['01']['correct'] / (counts['01']['correct'] + counts['01']['incorrect'])
-    # counts['01']['incorrect_p'] = counts['01']['incorrect'] / (counts['01']['correct'] + counts['01']['incorrect'])
-    # counts['10']['correct_p'] = counts['10']['correct'] / (counts['10']['correct'] + counts['10']['incorrect'])
-    # counts['10']['incorrect_p'] = counts['10']['incorrect'] / (counts['10']['correct'] + counts['10']['incorrect'])
-    # counts['00']['correct_p'] = counts['00']['correct'] / (counts['00']['correct'] + counts['00']['incorrect'])
-    # counts['00']['incorrect_p'] = counts['00']['incorrect'] / (counts['00']['correct'] + counts['00']['incorrect'])
-    # counts['11']['correct_p'] = counts['11']['correct'] / (counts['11']['correct'] + counts['11']['incorrect'])
-    # counts['11']['incorrect_p'] = counts['11']['incorrect'] / (counts['11']['correct'] + counts['11']['incorrect'])
     total = counts['11']['correct'] + counts['11']['incorrect'] + counts['00']['correct'] + counts['00']['incorrect'] + counts['01']['correct'] + counts['01']['incorrect'] + counts['10']['correct'] + counts['10']['incorrect']
     counts['11']['p'] = (counts['11']['correct'] + counts['11']['incorrect']) / total
     counts['00']['p'] = (counts['00']['correct'] + counts['00']['incorrect']) / total
@@ -345,48 +337,76 @@ def study_shape_color(data, shape, color):
     m_dict[shape + '_' + color]['1']['all'] = np.stack(m_dict[shape + '_' + color]['1']['all'])
     m_dict[shape + '_' + color]['2']['all'] = np.stack(m_dict[shape + '_' + color]['2']['all'])
 
-    print(f"Number {color}: {m_dict[color]['1']['all'].shape}")
+    # print(f"Number {color}: {m_dict[color]['1']['all'].shape}")
     m_dict[color]['1']['mean'] = np.mean(m_dict[color]['1']['all'], axis=0)
     m_dict[color]['1']['std'] = np.std(m_dict[color]['1']['all'], axis=0)
     del m_dict[color]['1']['all']
-    print(m_dict[color]['2']['all'].shape)
+    # print(m_dict[color]['2']['all'].shape)
     m_dict[color]['2']['mean'] = np.mean(m_dict[color]['2']['all'], axis=0)
     m_dict[color]['2']['std'] = np.std(m_dict[color]['2']['all'], axis=0)
     del m_dict[color]['2']['all']
 
-    print(f"Number {shape}: {m_dict[shape]['1']['all'].shape}")
+    # print(f"Number {shape}: {m_dict[shape]['1']['all'].shape}")
     m_dict[shape]['1']['mean'] = np.mean(m_dict[shape]['1']['all'], axis=0)
     m_dict[shape]['1']['std'] = np.std(m_dict[shape]['1']['all'], axis=0)
     del m_dict[shape]['1']['all']
-    print(m_dict[shape]['2']['all'].shape)
+    # print(m_dict[shape]['2']['all'].shape)
     m_dict[shape]['2']['mean'] = np.mean(m_dict[shape]['2']['all'], axis=0)
     m_dict[shape]['2']['std'] = np.std(m_dict[shape]['2']['all'], axis=0)
     del m_dict[shape]['2']['all']
 
-    print(f"Number {shape}_{color}: {m_dict[shape + '_' + color]['1']['all'].shape}")
+    # print(f"Number {shape}_{color}: {m_dict[shape + '_' + color]['1']['all'].shape}")
     m_dict[shape + '_' + color]['1']['mean'] = np.mean(m_dict[shape + '_' + color]['1']['all'], axis=0)
     m_dict[shape + '_' + color]['1']['std'] = np.std(m_dict[shape + '_' + color]['1']['all'], axis=0)
     del m_dict[shape + '_' + color]['1']['all']
-    print(m_dict[shape + '_' + color]['2']['all'].shape)
+    # print(m_dict[shape + '_' + color]['2']['all'].shape)
     m_dict[shape + '_' + color]['2']['mean'] = np.mean(m_dict[shape + '_' + color]['2']['all'], axis=0)
     m_dict[shape + '_' + color]['2']['std'] = np.std(m_dict[shape + '_' + color]['2']['all'], axis=0)
     del m_dict[shape + '_' + color]['2']['all']
     return m_dict
 
 
-def create_shape_color_combo(data):
+def create_shape_color_combos(data):
+    print('================================== SHAPES ==================================')
     for s in SHAPES:
         mean_1 = []
         mean_2 = []
+        cols = []
         for c in COLORS:
+            if (s, c) in OUTOFDOMAIN:
+                continue
+            sc = s + '_' + c
+            cols.append(c)
             result = study_shape_color(data, s, c)
             mean_1.append(result[sc]['1']['mean'])
-            mean_1.append(result[sc]['2']['mean'])
-        print(f'Mean messages for {s}: colors: {c}')
-        mean_1 = torch.from_numpy(np.stack(mean_1))
-        mean_2 = torch.from_numpy(np.stack(mean_1))
-        print(f'Agent 1: {mean_1})
-        print(f'Agent 2: {mean_2})
+            mean_2.append(result[sc]['2']['mean'])
+        if len(mean_1) > 0:
+            assert len(mean_1) == len(mean_2)
+            print(f'Mean messages for {s}: colors: {cols}')
+            mean_1 = torch.from_numpy(np.stack(mean_1))
+            mean_2 = torch.from_numpy(np.stack(mean_2))
+            print(f'Agent 1: {mean_1}')
+            print(f'Agent 2: {mean_2}')
+    print('================================== COLORS ==================================')
+    for c in COLORS:
+        mean_1 = []
+        mean_2 = []
+        sh = []
+        for s in SHAPES:
+            if (s, c) in OUTOFDOMAIN:
+                continue
+            sc = s + '_' + c
+            sh.append(s)
+            result = study_shape_color(data, s, c)
+            mean_1.append(result[sc]['1']['mean'])
+            mean_2.append(result[sc]['2']['mean'])
+        if len(mean_1) > 0:
+            assert len(mean_1) == len(mean_2)
+            print(f'Mean messages for {c}: shapes: {sh}')
+            mean_1 = torch.from_numpy(np.stack(mean_1))
+            mean_2 = torch.from_numpy(np.stack(mean_2))
+            print(f'Agent 1: {mean_1}')
+            print(f'Agent 2: {mean_2}')
 
 
 def print_shape_color_results(result, shape, color, sc):
@@ -398,7 +418,7 @@ def print_shape_color_results(result, shape, color, sc):
     print(f"{sc}: {2}:\nmean: {result[sc]['2']['mean']}\nstd: {result[sc]['2']['std']}")
 
 
-def analyze_messages(data, agents="both"):
+def analyze_messages(data):
     print(f'========================== Analyzing messages from {args.path} ==========================')
     m_dict, list_dict = build_message_dict(data, agents="one")
     m_dict_2, list_dict_2 = build_message_dict(data, agents="two")
@@ -415,10 +435,6 @@ def analyze_messages(data, agents="both"):
         print(f'{i}: Message: {l[0]}, count: {l[1]["total"]}')
     counts = count_pratios(m_dict)
     counts_2 = count_pratios(m_dict_2)
-    # print('================================== counts ==================================')
-    # pprint.pprint(counts)
-    # print('================================== counts 2 ==================================')
-    # pprint.pprint(counts_2)
     print('================================== pratio stats ==================================')
     mean_pratio = get_pratio_stats(counts)
     print('================================== pratio stats 2 ==================================')
@@ -460,74 +476,19 @@ def analyze_messages(data, agents="both"):
     sc = shape + '_' + color
     result = study_shape_color(data, shape, color)
     pprint.pprint(result)
-    print_shape_color_results(result, shape, color, sc)
     shape = "square"
     color = "blue"
     print(f'shape: {shape}, color: {color}')
     sc = shape + '_' + color
     result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-    shape = "ellipse"
-    color = "blue"
-    print(f'shape: {shape}, color: {color}')
-    sc = shape + '_' + color
-    result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-    shape = "rectangle"
-    color = "blue"
-    print(f'shape: {shape}, color: {color}')
-    sc = shape + '_' + color
-    result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-    shape = "cross"
-    color = "blue"
-    print(f'shape: {shape}, color: {color}')
-    sc = shape + '_' + color
-    result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-    shape = "semicircle"
-    color = "blue"
-    print(f'shape: {shape}, color: {color}')
-    sc = shape + '_' + color
-    result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-    shape = "pentagon"
-    color = "blue"
-    print(f'shape: {shape}, color: {color}')
-    sc = shape + '_' + color
-    result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-
-    shape = "cross"
+    pprint.pprint(result)
+    shape = "square"
     color = "yellow"
     print(f'shape: {shape}, color: {color}')
     sc = shape + '_' + color
     result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-    shape = "cross"
-    color = "green"
-    print(f'shape: {shape}, color: {color}')
-    sc = shape + '_' + color
-    result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-    shape = "cross"
-    color = "red"
-    print(f'shape: {shape}, color: {color}')
-    sc = shape + '_' + color
-    result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-    shape = "cross"
-    color = "cyan"
-    print(f'shape: {shape}, color: {color}')
-    sc = shape + '_' + color
-    result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
-    shape = "cross"
-    color = "gray"
-    print(f'shape: {shape}, color: {color}')
-    sc = shape + '_' + color
-    result = study_shape_color(data, shape, color)
-    print_shape_color_results(result, shape, color, sc)
+    pprint.pprint(result)
+    create_shape_color_combos(data)
 
 
 def check_distribution(data):
@@ -557,4 +518,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     data = pickle.load(open(args.path, 'rb'))
     check_distribution(data)
-    # analyze_messages(data, "one")
+    analyze_messages(data)

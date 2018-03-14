@@ -699,10 +699,10 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 debuglogger.debug(f'Message 2: {feats_2}, probs 2: {probs_2}')
                 debuglogger.debug(f'Correct dict: {correct_to_analyze}')
                 debuglogger.debug(f'Incorrect dict: {incorrect_to_analyze}')
-        
+
         debuglogger.debug(f'shapes dict: {shapes_accuracy}')
         debuglogger.debug(f'colors dict: {colors_accuracy}')
-        
+
         # Keep track of conversation lengths
         # TODO not relevant yet
         conversation_lengths_1 += torch.cat(s_feats_1,
@@ -2138,7 +2138,7 @@ def flags():
     gflags.DEFINE_string(
         "glove_path", "./glove.6B/glove.6B.100d.txt", "")
     gflags.DEFINE_boolean("shuffle_train", True, "")
-    gflags.DEFINE_boolean("shuffle_dev", True, "")
+    gflags.DEFINE_boolean("shuffle_dev", False, "")
     gflags.DEFINE_integer("random_seed", 7, "")
     gflags.DEFINE_enum(
         "resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")

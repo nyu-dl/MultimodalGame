@@ -1528,10 +1528,11 @@ def run():
             flogger.Log("Agent 2: {}".format(i + 2))
             logger.log(key="Agent 2: ", val=i + 2, step=step)
             agent2 = models_dict["agent" + str(i + 2)]
-            if i == 0:
+            if i < 7:
                 # Report in domain development accuracy and analyze messages and store examples
-                dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
+                pass
+                #dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
+                #    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
             else:
                 # Report in domain development accuracy
                 dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(

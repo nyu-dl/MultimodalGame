@@ -699,10 +699,10 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 debuglogger.debug(f'Message 2: {feats_2}, probs 2: {probs_2}')
                 debuglogger.debug(f'Correct dict: {correct_to_analyze}')
                 debuglogger.debug(f'Incorrect dict: {incorrect_to_analyze}')
-        
+
         debuglogger.debug(f'shapes dict: {shapes_accuracy}')
         debuglogger.debug(f'colors dict: {colors_accuracy}')
-        
+
         # Keep track of conversation lengths
         # TODO not relevant yet
         conversation_lengths_1 += torch.cat(s_feats_1,
@@ -1538,7 +1538,7 @@ def run():
                 dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
                     agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
             # Report out of domain development accuracy
-            #dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(
+            # dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(
             #    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
         # Report in domain development accuracy when agents communicate with themselves
         if step % FLAGS.log_self_com == 0:
@@ -1998,11 +1998,11 @@ def run():
                         if i == 0:
                             # Report in domain development accuracy and analyze messages and store examples
                             dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
-                                _agent1, _agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'A_{i + 1}_{i + 2}')
+                                _agent1, _agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
                         else:
                             # Report in domain development accuracy and checkpoint if best result
                             dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
-                                agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'A_{i + 1}_{i + 2}')
+                                agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
 
                 # Report out of domain development accuracy
                 dev_accuracy_ood, total_accuracy_com = get_and_log_dev_performance(
@@ -2014,7 +2014,7 @@ def run():
                     agent = models_dict["agent" + str(i + 1)]
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
                     dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
-                        agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'self_com_A_{i + 1}')
+                        agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:
@@ -2139,7 +2139,7 @@ def flags():
     gflags.DEFINE_string(
         "glove_path", "./glove.6B/glove.6B.100d.txt", "")
     gflags.DEFINE_boolean("shuffle_train", True, "")
-    gflags.DEFINE_boolean("shuffle_dev", True, "")
+    gflags.DEFINE_boolean("shuffle_dev", False, "")
     gflags.DEFINE_integer("random_seed", 7, "")
     gflags.DEFINE_enum(
         "resnet", "34", ["18", "34", "50", "101", "152"], "Specify Resnet variant.")

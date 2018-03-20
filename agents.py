@@ -7,6 +7,7 @@ from torch.nn.parameter import Parameter
 import math
 import numpy as np
 import logging
+import functools
 
 from misc import xavier_normal
 
@@ -137,17 +138,21 @@ class ImageProcessorFromScratch(nn.Module):
 
     def build_model(self):
         layers = []
-        layers += [nn.Conv2d(3, 32, kernel_size=5, stride=2)]
+        layers += [nn.Conv2d(3, 16, kernel_size=3, stride=2)]
+        layers += [nn.BatchNorm2d(16)]
+        layers += [nn.ReLU(inplace=True)]
+        layers += [nn.Conv2d(16, 32, kernel_size=3, stride=2)]
         layers += [nn.BatchNorm2d(32)]
         layers += [nn.ReLU(inplace=True)]
         layers += [nn.Dropout2d(p=self.dropout)]
-        layers += [nn.Conv2d(32, 64, kernel_size=5, stride=2)]
+        layers += [nn.Conv2d(32, 32, kernel_size=3, stride=2)]
+        layers += [nn.BatchNorm2d(32)]
+        layers += [nn.ReLU(inplace=True)]
+        layers += [nn.Conv2d(32, 64, kernel_size=3, stride=2)]
         layers += [nn.BatchNorm2d(64)]
         layers += [nn.ReLU(inplace=True)]
-        layers += [nn.Conv2d(64, self.hid_dim, kernel_size=5, stride=2)]
-        layers += [nn.BatchNorm2d(self.hid_dim)]
-        # layers += [nn.ReLU(inplace=True)]
         layers += [nn.Dropout2d(p=self.dropout)]
+        layers += [nn.Conv2d(64, self.hid_dim, kernel_size=3, stride=2)]
         return nn.Sequential(*layers)
 
     def reset_parameters(self):
@@ -568,17 +573,22 @@ if __name__ == "__main__":
                   im_from_scratch,
                   dropout)
     print(agent)
+    total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
+                        for p in agent.parameters()])
+    image_proc_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
+                            for p in agent.image_processor.parameters()])
+    print(f'Total params: {total_params}, image proc params: {image_proc_params}')
     x = _Variable(torch.ones(batch_size, 3, im_feat_dim, im_feat_dim))
     m = _Variable(torch.ones(batch_size, m_dim))
     desc = _Variable(torch.ones(batch_size, num_classes, desc_dim))
 
     for i in range(2):
         s, w, y, r = agent(x, m, i, desc, use_message, batch_size, training)
-        print(f's_binary: {s[0]}')
-        print(f's_probs: {s[1]}')
-        print(f'w_binary: {w[0]}')
-        print(f'w_probs: {w[1]}')
-        print(f's_binary: {s[0]}')
-        print(f's_probs: {s[1]}')
-        print(f'y: {y}')
-        print(f'r: {r}')
+        # print(f's_binary: {s[0]}')
+        # print(f's_probs: {s[1]}')
+        # print(f'w_binary: {w[0]}')
+        # print(f'w_probs: {w[1]}')
+        # print(f's_binary: {s[0]}')
+        # print(f's_probs: {s[1]}')
+        # print(f'y: {y}')
+        # print(f'r: {r}')

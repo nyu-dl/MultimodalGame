@@ -1537,7 +1537,7 @@ def run():
                 dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
                     agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
             # Report out of domain development accuracy
-            #dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(
+            # dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(
             #    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
         # Report in domain development accuracy when agents communicate with themselves
         if step % FLAGS.log_self_com == 0:

@@ -232,6 +232,7 @@ def calc_entropy_ratio(data, agents, answer_type):
     entropies = []
     messages = []
     message_probs = []
+    convert = torch.log(torch.zeros(1).fill_(2))
     for _, d in enumerate(data):
         include = None
         if answer_type == "both":
@@ -245,32 +246,35 @@ def calc_entropy_ratio(data, agents, answer_type):
                 for msg, m_prob in zip(d["msg_1"], d["probs_1"]):
                     messages.append(msg.numpy())
                     message_probs.append(m_prob.numpy())
-                    H = - torch.mul(m_prob, torch.log(m_prob)).sum()
+                    H = - torch.mul(m_prob, torch.log(m_prob) / convert).sum() - torch.mul(1 - m_prob, torch.log(1 - m_prob) / convert).sum()
                     entropies.append(H)
                 for msg, m_prob in zip(d["msg_2"], d["probs_2"]):
                     messages.append(msg.numpy())
                     message_probs.append(m_prob.numpy())
-                    H = - torch.mul(m_prob, torch.log(m_prob)).sum()
+                    H = - torch.mul(m_prob, torch.log(m_prob) / convert).sum() - torch.mul(1 - m_prob, torch.log(1 - m_prob) / convert).sum()
                     entropies.append(H)
             elif agents == "one":
                 for msg, m_prob in zip(d["msg_1"], d["probs_1"]):
                     messages.append(msg.numpy())
                     message_probs.append(m_prob.numpy())
-                    H = - torch.mul(m_prob, torch.log(m_prob)).sum()
+                    H = - torch.mul(m_prob, torch.log(m_prob) / convert).sum() - torch.mul(1 - m_prob, torch.log(1 - m_prob) / convert).sum()
                     entropies.append(H)
             elif agents == "two":
                 for msg, m_prob in zip(d["msg_2"], d["probs_2"]):
                     messages.append(msg.numpy())
                     message_probs.append(m_prob.numpy())
-                    H = - torch.mul(m_prob, torch.log(m_prob)).sum()
+                    H = - torch.mul(m_prob, torch.log(m_prob) / convert).sum() - torch.mul(1 - m_prob, torch.log(1 - m_prob) / convert).sum()
                     entropies.append(H)
+    # print(f'Entropies: {entropies[:10]}')
     mean_e = sum(entropies) / len(entropies)
     messages = np.stack(messages)
     message_probs = np.stack(message_probs)
     mean_m = torch.from_numpy(np.mean(messages, axis=0)).float()
-    ent_mean_m = - torch.mul(mean_m, torch.log(mean_m)).sum()
     mean_m_prob = torch.from_numpy(np.mean(message_probs, axis=0)).float()
-    ent_mean_m_prob = - torch.mul(mean_m_prob, torch.log(mean_m_prob)).sum()
+    # Convert to base 2
+    ent_mean_m = - torch.mul(mean_m, torch.log(mean_m) / convert).sum() - torch.mul(1 - mean_m, torch.log(1 - mean_m) / convert).sum()
+    ent_mean_m_prob = - torch.mul(mean_m_prob, torch.log(mean_m_prob) / convert).sum() - torch.mul(1 - mean_m_prob, torch.log(1 - mean_m_prob) / convert).sum()
+    # print(f'E(m|x) = {mean_m}')
     print(f'E[H(m|x)] = {mean_e}, H[E(m|x)] = {ent_mean_m}/{ent_mean_m_prob}')
     print(f'Ratio: {mean_e / ent_mean_m}/{mean_e / ent_mean_m_prob}')
 

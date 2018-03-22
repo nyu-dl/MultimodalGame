@@ -1988,21 +1988,23 @@ def run():
                                optimizers_dict, gpu=0 if FLAGS.cuda else -1)
                     # Re-run in domain dev performance and log examples and analyze messages
                     # Also get pairs of results
-                    for i in range(FLAGS.num_agents - 1):
-                        flogger.Log("Agent 1: {}".format(i + 1))
-                        logger.log(key="Agent 1: ", val=i + 1, step=step)
-                        _agent1 = models_dict["agent" + str(i + 1)]
-                        flogger.Log("Agent 2: {}".format(i + 2))
-                        logger.log(key="Agent 2: ", val=i + 2, step=step)
-                        _agent2 = models_dict["agent" + str(i + 2)]
-                        if i == 0:
-                            # Report in domain development accuracy and analyze messages and store examples
-                            dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
-                                _agent1, _agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
-                        else:
-                            # Report in domain development accuracy and checkpoint if best result
-                            dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
-                                agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
+                    # Time consuming to run, only run if dev_acc high enough
+                    if best_dev_acc > 0.6:
+                        for i in range(FLAGS.num_agents - 1):
+                            flogger.Log("Agent 1: {}".format(i + 1))
+                            logger.log(key="Agent 1: ", val=i + 1, step=step)
+                            _agent1 = models_dict["agent" + str(i + 1)]
+                            flogger.Log("Agent 2: {}".format(i + 2))
+                            logger.log(key="Agent 2: ", val=i + 2, step=step)
+                            _agent2 = models_dict["agent" + str(i + 2)]
+                            if i == 0:
+                                # Report in domain development accuracy and analyze messages and store examples
+                                dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
+                                    _agent1, _agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
+                            else:
+                                # Report in domain development accuracy and checkpoint if best result
+                                dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
+                                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
 
                 # Report out of domain development accuracy
                 dev_accuracy_ood, total_accuracy_com = get_and_log_dev_performance(
@@ -2090,7 +2092,7 @@ def flags():
     gflags.DEFINE_integer("save_after", 1000,
                           "Min step (num batches) after which to save")
     gflags.DEFINE_integer(
-        "save_interval", 100, "How often to save after min batches have been reached")
+        "save_interval", 1000, "How often to save after min batches have been reached")
     gflags.DEFINE_string("checkpoint", None, "Path to save data")
     gflags.DEFINE_string("conf_mat", None, "Path to save confusion matrix")
     gflags.DEFINE_string("log_path", "./logs", "Path to save logs")

@@ -689,16 +689,17 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 colors_accuracy[color]["total"] += 1
                 if correct_indices_com[_i]:
                     colors_accuracy[color]["correct"] += 1
-            # Store batch data to analyze
-            if correct_indices_com[_i]:
-                correct_to_analyze = add_data_point(batch, _i, correct_to_analyze, feats_1, feats_2, probs_1, probs_2)
-            else:
-                incorrect_to_analyze = add_data_point(batch, _i, incorrect_to_analyze, feats_1, feats_2, probs_1, probs_2)
-            if _i == 5:
-                debuglogger.debug(f'Message 1: {feats_1}, probs 1: {probs_1}')
-                debuglogger.debug(f'Message 2: {feats_2}, probs 2: {probs_2}')
-                debuglogger.debug(f'Correct dict: {correct_to_analyze}')
-                debuglogger.debug(f'Incorrect dict: {incorrect_to_analyze}')
+            if store_examples or analyze_messages or save_messages:
+                # Store batch data to analyze
+                if correct_indices_com[_i]:
+                    correct_to_analyze = add_data_point(batch, _i, correct_to_analyze, feats_1, feats_2, probs_1, probs_2)
+                else:
+                    incorrect_to_analyze = add_data_point(batch, _i, incorrect_to_analyze, feats_1, feats_2, probs_1, probs_2)
+                if _i == 5:
+                    debuglogger.debug(f'Message 1: {feats_1}, probs 1: {probs_1}')
+                    debuglogger.debug(f'Message 2: {feats_2}, probs 2: {probs_2}')
+                    debuglogger.debug(f'Correct dict: {correct_to_analyze}')
+                    debuglogger.debug(f'Incorrect dict: {incorrect_to_analyze}')
 
         debuglogger.debug(f'shapes dict: {shapes_accuracy}')
         debuglogger.debug(f'colors dict: {colors_accuracy}')
@@ -749,16 +750,16 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
             callback(agent1, agent2, batch, callback_dict)
         # break
 
-    debuglogger.info(f'Finishing iterating through dev set, storing examples...')
     if store_examples:
+        debuglogger.info(f'Finishing iterating through dev set, storing examples...')
         store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
         store_exemplar_batch(incorrect_to_analyze, "incorrect", logger, flogger)
-    debuglogger.info(f'Analyzing messages...')
     if analyze_messages:
+        debuglogger.info(f'Analyzing messages...')
         run_analyze_messages(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
         # run_analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
-    debuglogger.info(f'Saving messages...')
     if save_messages:
+        debuglogger.info(f'Saving messages...')
         save_messages_and_stats(correct_to_analyze, incorrect_to_analyze, agent_tag)
 
     # Print confusion matrix

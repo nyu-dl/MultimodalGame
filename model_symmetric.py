@@ -1531,7 +1531,7 @@ def run():
             if i < 7:
                 # Report in domain development accuracy and analyze messages and store examples
                 pass
-                #dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
+                # dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
                 #    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
             else:
                 # Report in domain development accuracy
@@ -2011,7 +2011,7 @@ def run():
                     agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, f'Out of Domain:', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
 
             # Report in domain development accuracy when agents communicate with themselves
-            if step % FLAGS.log_self_com == 0:
+            if step > 0 and step % FLAGS.log_self_com == 0:
                 for i in range(FLAGS.num_agents):
                     agent = models_dict["agent" + str(i + 1)]
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))

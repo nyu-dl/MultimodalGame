@@ -23,7 +23,7 @@ from torchvision.utils import save_image
 
 from sklearn.metrics import confusion_matrix
 
-from misc import recursively_set_device, torch_save, torch_load
+from misc import recursively_set_device, torch_save, torch_load, torch_load_communities
 from misc import VisdomLogger as Logger
 from misc import FileLogger
 from misc import read_log_load
@@ -32,6 +32,7 @@ from misc import build_mask
 
 from agents import Agent
 from dataset_loader import load_shapeworld_dataset
+from community_util import sample_agents, build_train_matrix, build_eval_list
 from binary_vectors import extract_binary
 from sparks import sparks
 
@@ -689,6 +690,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 colors_accuracy[color]["total"] += 1
                 if correct_indices_com[_i]:
                     colors_accuracy[color]["correct"] += 1
+            # Time consuming, so only do this if necessary
             if store_examples or analyze_messages or save_messages:
                 # Store batch data to analyze
                 if correct_indices_com[_i]:
@@ -924,6 +926,24 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
                 extra['colors_accuracy'][k]['correct'] / extra['colors_accuracy'][k]['total']))
 
     return dev_accuracy_log, total_accuracy_com
+
+
+def eval_community(eval_list, models_dict, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=""):
+    eval_type = {1: "Self com, agent connected to multiple pools",
+                 2: "Self com, agent connected to just one pool",
+                 3: "Within pool com, different agents, trained together",
+                 4: "Within pool com, different agents, never trained together",
+                 5: "Cross pool com, different agents, trained together",
+                 6: "Cross pool com, different agents, never trained together"}
+    for num, pair in enumerate(eval_list):
+        logger.log(key="Dev accuracy: ",
+                   val=eval_type[num + 1], step=step)
+        flogger.Log(f'Dev accuracy: {eval_type[num + 1]}, step: {step}')
+        for (i, j) in pair:
+            agent1 = models_dict["agent" + str(i + 1)]
+            agent2 = models_dict["agent" + str(j + 1)]
+            domain = f'Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
+            _, _ = get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
 
 
 def corrupt_message(corrupt_region, agent, binary_message):
@@ -1398,18 +1418,44 @@ def run():
     agents = []
     optimizers_dict = {}
     models_dict = {}
+    # Only used for training agent communities
+    num_agents_per_community = None
+    intra_pool_connect_p = None
+    train_vec_prob = None  # Probility distribution over agent pairs, used to sample pairs per batch
+    agent_idx_list = None
+    eval_agent_list = None  # List of agent pairs to evaluate each dev eval
 
     # Check agent setup
     if FLAGS.num_agents < 2:
         flogger.Log("Only {} agents. There must be at least 2. Set FLAGS.num_agents".format(FLAGS.num_agents))
         sys.exit()
-    elif FLAGS.num_agents > 2 and not FLAGS.agent_pools:
+    elif FLAGS.num_agents > 2 and not (FLAGS.agent_pools or FLAGS.agent_communities):
         flogger.Log("{} is too many agents. There can only be two if FLAGS.agent_pools is false".format(FLAGS.num_agents))
+        sys.exit()
+    if FLAGS.agent_pools and FLAGS.agent_communities:
+        flogger.Log("You cannot train an agent pool and community at the same time. Please select one of the other")
         sys.exit()
     if not FLAGS.use_binary:
         flogger.Log("Non binary agent communication not implemented yet. Set FLAGS.use_binary to True")
         sys.exit()
+    if FLAGS.agent_communities:
+        if FLAGS.num_communities != len(FLAGS.num_agents_per_community):
+            flogger.Log("Number of communities doesn't match length of community size list")
+            sys.exit()
+        if FLAGS.num_communities != len(FLAGS.community_checkpoints):
+            flogger.Log("Number of communities doesn't match length of community checkpoint list. Use None to train from scratch.")
+            sys.exit()
+        if FLAGS.num_communities != len(FLAGS.intra_pool_connect_p):
+            flogger.Log("Number of communities doesn't match length of intra community connectivity list")
+            sys.exit()
+        num_agents_per_community = [int(x) for x in FLAGS.num_agents_per_community]
+        intra_pool_connect_p = [float(x) for x in FLAGS.intra_pool_connect_p]
+        if FLAGS.num_agents != sum(num_agents_per_community):
+            flogger.Log("Total number of agents does not match sum of agents in each community")
+            sys.exit()
+        flogger.Log(f'Total number of agents: {FLAGS.num_agents}, Agents per community: {num_agents_per_community}')
 
+    # Create agents
     for _ in range(FLAGS.num_agents):
         agent = Agent(im_feature_type=FLAGS.img_feat,
                       im_feat_dim=FLAGS.img_feat_dim,
@@ -1450,17 +1496,27 @@ def run():
         optimizers_dict[optim_name] = optimizer_agent
         models_dict[agent_name] = agent
 
+    if FLAGS.agent_communities:
+        flogger.Log(f'Training {FLAGS.num_communities} communities of agents, type: {FLAGS.community_type}')
     flogger.Log("Number of agents: {}".format(len(agents)))
     for k in optimizers_dict:
         flogger.Log("Optimizer {}: {}".format(k, optimizers_dict[k]))
+
+    # Create additional data structures if training with agent communites
+    # These handle to sampling of agents during training, and selection of agent pairs when evaluating of the dev set
+    if FLAGS.agent_communities:
+        (train_vec_prob, agent_idx_list) = build_train_matrix(num_agents_per_community, FLAGS.community_type, intra_pool_connect_p, FLAGS.inter_pool_connect_p, FLAGS.intra_inter_ratio)
+        eval_agent_list = build_eval_list(num_agents_per_community, FLAGS.community_type, train_vec_prob)
 
     # Training metrics
     epoch = 0
     step = 0
     best_dev_acc = 0
 
-    # Optionally load previously saved model
-    if os.path.exists(FLAGS.checkpoint):
+    # Optionally load previously saved models
+    if FLAGS.agent_communities:
+        torch_load_communities(FLAGS.community_checkpoints, num_agents_per_community, models_dict, optimizers_dict)
+    elif os.path.exists(FLAGS.checkpoint):
         flogger.Log("Loading from: " + FLAGS.checkpoint)
         data = torch_load(FLAGS.checkpoint, models_dict, optimizers_dict)
         flogger.Log("Loaded at step: {} and best dev acc: {}".format(
@@ -1475,8 +1531,8 @@ def run():
         for o in optimizers_dict.values():
             recursively_set_device(o.state_dict(), gpu=0)
 
-    # If training / evaluating with pools of agents sample with each batch
-    if FLAGS.agent_pools:
+    # If training / evaluating with pools of agents or communities of agents sample with each batch
+    if FLAGS.agent_pools or FLAGS.agent_communities:
         agent1 = None
         agent2 = None
         optimizer_agent1 = None
@@ -1519,35 +1575,39 @@ def run():
                                           'total_acc_atl1_nc': [],  # % at least 1 agent right before comms
                                           'total_acc_atl1_com': []  # % at least 1 agent right after comms
                                           })
+        if FLAGS.agent_communities:
+            eval_community(eval_agent_list, models_dict, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+        else:
+            # For the pairs of agents calculate results
+            # Applies to both pools of agents and an agent pair
+            for i in range(FLAGS.num_agents - 1):
+                flogger.Log("Agent 1: {}".format(i + 1))
+                logger.log(key="Agent 1: ", val=i + 1, step=step)
+                agent1 = models_dict["agent" + str(i + 1)]
+                flogger.Log("Agent 2: {}".format(i + 2))
+                logger.log(key="Agent 2: ", val=i + 2, step=step)
+                agent2 = models_dict["agent" + str(i + 2)]
+                if i < 7:
+                    # Report in domain development accuracy and analyze messages and store examples
+                    pass
+                    # dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
+                    #    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
+                else:
+                    # Report in domain development accuracy
+                    dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
+                        agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
 
-        # For the pairs of agents calculate results
-        # Applies to both pools of agents and an agent pair
-        for i in range(FLAGS.num_agents - 1):
-            flogger.Log("Agent 1: {}".format(i + 1))
-            logger.log(key="Agent 1: ", val=i + 1, step=step)
-            agent1 = models_dict["agent" + str(i + 1)]
-            flogger.Log("Agent 2: {}".format(i + 2))
-            logger.log(key="Agent 2: ", val=i + 2, step=step)
-            agent2 = models_dict["agent" + str(i + 2)]
-            if i < 7:
-                # Report in domain development accuracy and analyze messages and store examples
-                pass
-                # dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
-                #    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
-            else:
-                # Report in domain development accuracy
-                dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
-            # Report out of domain development accuracy
-            # dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(
-            #    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
-        # Report in domain development accuracy when agents communicate with themselves
-        if step % FLAGS.log_self_com == 0:
-            for i in range(FLAGS.num_agents):
-                agent = models_dict["agent" + str(i + 1)]
-                flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
-                dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
-                    agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_self_com_A_{i + 1}')
+                # Report out of domain development accuracy
+                # dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(
+                #    agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
+
+            # Report in domain development accuracy when agents communicate with themselves
+            if step % FLAGS.log_self_com == 0:
+                for i in range(FLAGS.num_agents):
+                    agent = models_dict["agent" + str(i + 1)]
+                    flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
+                    dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
+                        agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_self_com_A_{i + 1}')
         sys.exit()
     elif FLAGS.binary_only:
         if not os.path.exists(FLAGS.checkpoint):
@@ -1616,22 +1676,27 @@ def run():
         for i_batch, batch in enumerate(dataloader):
             debuglogger.debug(f'Batch {i_batch}')
 
-            # Select agents if training with pools
+            # Select agents if training with pools or communities
             if FLAGS.agent_pools:
                 idx = random.randint(0, len(agents) - 1)
-                # flogger.Log("Selection from pool: Agent 1: {}".format(idx))
-                # logger.log(key="Selection from pool: Agent 1: ", val=idx, step=step)
                 agent1 = agents[idx]
                 optimizer_agent1 = optimizers_dict["optimizer_agent" + str(idx + 1)]
                 agent_idxs[0] = idx + 1
                 old_idx = idx
                 while idx == old_idx:
                     idx = random.randint(0, len(agents) - 1)
-                # flogger.Log("Selection from pool: Agent 2: {}".format(idx))
-                # logger.log(key="Selection from pool: Agent 2: ", val=idx, step=step)
                 agent2 = agents[idx]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx + 1)]
                 agent_idxs[1] = idx + 1
+            elif FLAGS.agent_communities:
+                (idx1, idx2) = sample_agents(train_vec_prob, agent_idx_list)
+                agent1 = agents[idx1]
+                optimizer_agent1 = optimizers_dict["optimizer_agent" + str(idx1 + 1)]
+                agent_idxs[0] = idx1 + 1
+                agent2 = agents[idx2]
+                optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx2 + 1)]
+                agent_idxs[1] = idx2 + 1
+            debuglogger.info(f'Agent 1: {agent_idxs[0]}, Agent 1: {agent_idxs[1]}')
 
             # Converted to Variable in get_classification_loss_and_stats
             target = batch["target"]
@@ -1987,10 +2052,10 @@ def run():
                     data = dict(step=step, best_dev_acc=best_dev_acc)
                     torch_save(FLAGS.checkpoint + "_best", data, models_dict,
                                optimizers_dict, gpu=0 if FLAGS.cuda else -1)
-                    # Re-run in domain dev performance and log examples and analyze messages
-                    # Also get pairs of results
+
+                    # Re-run in domain dev performance and log examples and analyze messages for a number of pairs of agents
                     # Time consuming to run, only run if dev_acc high enough
-                    if best_dev_acc > 0.6:
+                    if best_dev_acc > 0.7 and FLAGS.agent_pools:
                         for i in range(FLAGS.num_agents - 1):
                             flogger.Log("Agent 1: {}".format(i + 1))
                             logger.log(key="Agent 1: ", val=i + 1, step=step)
@@ -2011,8 +2076,12 @@ def run():
                 dev_accuracy_ood, total_accuracy_com = get_and_log_dev_performance(
                     agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood, logger, flogger, f'Out of Domain:', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
 
+            # Report in domain development accuracy when training agent communities
+            if FLAGS.agent_communities and step % FLAGS.log_community_eval == 0:
+                eval_community(eval_agent_list, models_dict, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+
             # Report in domain development accuracy when agents communicate with themselves
-            if step > 0 and step % FLAGS.log_self_com == 0:
+            if FLAGS.agent_pools and step % FLAGS.log_self_com == 0:
                 for i in range(FLAGS.num_agents):
                     agent = models_dict["agent" + str(i + 1)]
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
@@ -2121,6 +2190,7 @@ def flags():
     gflags.DEFINE_integer("log_interval", 50, "")
     gflags.DEFINE_integer("log_dev", 1000, "")
     gflags.DEFINE_integer("log_self_com", 10000, "")
+    gflags.DEFINE_integer("log_community_eval", 1000, "")
 
     # Data settings
     gflags.DEFINE_integer("wv_dim", 100, "Dimension of the word vectors")
@@ -2175,7 +2245,16 @@ def flags():
                           "Whether to have a cooperative or individual reward structure")
     gflags.DEFINE_boolean("agent_pools", False,
                           "Whether to have a pool of agents to train instead of two fixed agents")
-    gflags.DEFINE_integer("num_agents", 2, "How many agents in the pool")
+    gflags.DEFINE_integer("num_agents", 2, "How many agents total (single pool or community)")
+    gflags.DEFINE_boolean("agent_communities", False,
+                          "Whether to have a community of agents to train instead of two fixed agents")
+    gflags.DEFINE_integer("num_communities", 2, "How many communities of agents")
+    gflags.DEFINE_string("community_type", "dense", "Type of agent community: dense or hub_spoke")
+    gflags.DEFINE_list("community_checkpoints", ['None', 'None'], "list of checkpoints per community")
+    gflags.DEFINE_list("num_agents_per_community", [5, 5], "Number of agents per community. Specify one per community, can be different")
+    gflags.DEFINE_list("intra_pool_connect_p", [1.0, 1.0], "Percentage of intra pool connectivity. Specify one value per community, can be different")
+    gflags.DEFINE_float("inter_pool_connect_p", 0.1, "Percentage of inter pool connectvity. Specify one value")
+    gflags.DEFINE_float("intra_inter_ratio", 1.0, "Ratio of intra to inter pool training. Default is 1.0. Agents across pools and within pools will be trained equally.")
     gflags.DEFINE_float("first_msg", 0, "Value to fill the first message with")
     gflags.DEFINE_boolean("visual_attn", False, "agents attends over image")
     gflags.DEFINE_boolean(

@@ -99,6 +99,32 @@ def torch_load(filename, models_dict, optimizers_dict):
     return checkpoint['data']
 
 
+def torch_load_communities(filenames, num_agents_per_community, models_dict, optimizers_dict):
+    offset = 0
+    # TODO - check this works with trained agents
+    for f, num in zip(filenames, num_agents_per_community):
+        if f != 'None':
+            filename = os.path.expanduser(f)
+            if not os.path.exists(filename):
+                raise Exception("File does not exist: " + filename)
+
+            checkpoint = torch.load(filename)
+            data = checkpoint['data']
+            for i in range(num):
+                i_0 = i + offset
+                key_0 = "agent" + str(i_0 + 1)
+                key = "agent" + str(i + 1)
+                models_dict[key_0].load_state_dict(checkpoint['models'][key])
+                key_0 = "optimizer_agent" + str(i_0 + 1)
+                key = "optimizer_agent" + str(i + 1)
+                optimizers_dict[key_0].load_state_dict(checkpoint['optimizers'][key])
+            debuglogger.info(f'Loading agents {offset + 1} - {offset + num - 1} from checkpoint {f}')
+            debuglogger.info(f'Loaded at step {data["step"]} and best dev acc {data["best_dev_acc"]}')
+        else:
+            debuglogger.info(f'No checkpoint given for agents {offset + 1} - {offset + num}, training from scratch...')
+        offset += num
+
+
 class VisdomLogger(object):
     """
     Logs data to visdom
@@ -296,7 +322,7 @@ def load_hdf5(hdf5_file, batch_size, random_seed, shuffle, truncate_final_batch=
         batch['target'] = torch.LongTensor(
             list(map(map_labels, f["Target"][batch_indices])))
         # Location format broken in hdf5 in python 3
-        #batch['example_ids'] = f["Location"][batch_indices]
+        # batch['example_ids'] = f["Location"][batch_indices]
 
         batch['layer4_2'] = torch.from_numpy(
             f["layer4_2"][batch_indices]).float().squeeze()

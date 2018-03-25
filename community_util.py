@@ -17,6 +17,7 @@ debuglogger.setLevel('DEBUG')
 
 
 def sample_agents(train_probs, agent_idx_list):
+    ''' Takes in a probability distribution over agent pairs and a mapping from from flattened index to agent pairs, and returns a pair of agent indexes'''
     idx = np.random.choice(list(range(len(agent_idx_list))), p=train_probs)
     (agent1, agent2) = agent_idx_list[idx]
     return (agent1, agent2)
@@ -78,6 +79,9 @@ def build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_po
         debuglogger.info(f'Inter pool connect: {torch.from_numpy(inter_train_matrix)}')
         total_interpool = np.sum(inter_train_matrix)
         debuglogger.info(f'Total interpool: {total_interpool}')
+        if total_interpool == 0:
+            debuglogger.warn(f'No inter pool connections, exiting (comment out this line in community_util.py if this is what you are after)...')
+            sys.exit()
         # Adjust to correct training ratio between intra and inter pool
         cur_ratio = total_intrapool / total_interpool
         if total_interpool > 0 and total_intrapool > 0:

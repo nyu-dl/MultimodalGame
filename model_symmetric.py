@@ -5,6 +5,7 @@ import time
 import numpy as np
 import random
 import h5py
+import copy
 import functools
 import logging
 import pickle
@@ -1416,6 +1417,7 @@ def run():
 
     # Initialize Agents
     agents = []
+    frozen_agents = []
     optimizers_dict = {}
     models_dict = {}
     # Only used for training agent communities
@@ -1495,6 +1497,9 @@ def run():
         agent_name = "agent" + str(_ + 1)
         optimizers_dict[optim_name] = optimizer_agent
         models_dict[agent_name] = agent
+
+    # Copy agents to measure how much the language has changed
+    frozen_agents = copy.deepcopy(agents)
 
     if FLAGS.agent_communities:
         flogger.Log(f'Training {FLAGS.num_communities} communities of agents, type: {FLAGS.community_type}')
@@ -2078,7 +2083,14 @@ def run():
 
             # Report in domain development accuracy when training agent communities
             if FLAGS.agent_communities and step % FLAGS.log_community_eval == 0:
-                eval_community(eval_agent_list, models_dict, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+                # eval_community(eval_agent_list, models_dict, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+                # Log how much the language has changed by measuring the performance of one agent from each pool playing a frozen version of itself.
+                offset = 0
+                for _, p in enumerate(num_agents_per_community):
+                    idx = offset + p - 1
+                    dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                        agents[idx], frozen_agents[idx], FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, f'In Domain, Pool {_ + 1}, current version of agent {idx + 1} playing with frozen version of itself, ids: {id(agents[idx])}/{id(frozen_agents[idx])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+                    offset += p
 
             # Report in domain development accuracy when agents communicate with themselves
             if FLAGS.agent_pools and step % FLAGS.log_self_com == 0:

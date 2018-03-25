@@ -202,11 +202,11 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
     caption_str: correct natural language description of the image
     """
     # Read data
-    debuglogger.info(f'Reading in dataset...')
+    debuglogger.debug(f'Reading in dataset...')
     load_cmd = 'load(' + data_path + ')'
     data = dataset(dtype=ds_type, name=name, config=load_cmd)
     generated = data.generate(n=size, mode=mode)
-    debuglogger.info(f'Dataset read...')
+    debuglogger.debug(f'Dataset read...')
     order = list(range(size))
     assert len(generated['texts_str']) == size
 

@@ -95,12 +95,12 @@ def get_points_for_masks(pt1, pt2, width, height):
 
 def generate_mask(real_image):
     (ch, width, height) = real_image.shape
-    save_image(real_image, 'test_before.png')
+    # save_image(real_image, 'test_before.png')
     real_image = real_image.permute(1, 2, 0)
     image = np.zeros((real_image.size(0), real_image.size(1), real_image.size(2)))
     # Convert to PIL
     im = Image.fromarray(image.astype('uint8') * 255, mode='RGB')
-    im.save('pil_test.png')
+    # im.save('pil_test.png')
     # Generate mask
     pt1, pt2 = generate_random_points(width, height)
     points_im1, points_im2 = get_points_for_masks(pt1, pt2, width, height)

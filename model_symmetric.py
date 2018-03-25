@@ -1417,9 +1417,9 @@ def run():
 
     # Initialize Agents
     agents = []
-    frozen_agents = []
     optimizers_dict = {}
     models_dict = {}
+    frozen_agents = {}
     # Only used for training agent communities
     num_agents_per_community = None
     intra_pool_connect_p = None
@@ -1498,9 +1498,6 @@ def run():
         optimizers_dict[optim_name] = optimizer_agent
         models_dict[agent_name] = agent
 
-    # Copy agents to measure how much the language has changed
-    frozen_agents = copy.deepcopy(agents)
-
     if FLAGS.agent_communities:
         flogger.Log(f'Training {FLAGS.num_communities} communities of agents, type: {FLAGS.community_type}')
     flogger.Log("Number of agents: {}".format(len(agents)))
@@ -1528,6 +1525,9 @@ def run():
             data['step'], data['best_dev_acc']))
         step = data['step']
         best_dev_acc = data['best_dev_acc']
+
+    # Copy agents to measure how much the language has changed
+    frozen_agents = copy.deepcopy(models_dict)
 
     # GPU support
     if FLAGS.cuda:
@@ -2083,13 +2083,15 @@ def run():
 
             # Report in domain development accuracy when training agent communities
             if FLAGS.agent_communities and step % FLAGS.log_community_eval == 0:
-                # eval_community(eval_agent_list, models_dict, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+                eval_community(eval_agent_list, models_dict, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+
                 # Log how much the language has changed by measuring the performance of one agent from each pool playing a frozen version of itself.
                 offset = 0
                 for _, p in enumerate(num_agents_per_community):
-                    idx = offset + p - 1
+                    idx = offset + p - 1  # Select last agent from each community to play with itself
+                    key = "agent" + str(idx + 1)
                     dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                        agents[idx], frozen_agents[idx], FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, f'In Domain, Pool {_ + 1}, current version of agent {idx + 1} playing with frozen version of itself, ids: {id(agents[idx])}/{id(frozen_agents[idx])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+                        models_dict[key], frozen_agents[key], FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, f'In Domain, Pool {_ + 1}, current version of agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
                     offset += p
 
             # Report in domain development accuracy when agents communicate with themselves

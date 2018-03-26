@@ -948,8 +948,8 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
         for (i, j) in pair:
             agent1 = models_dict["agent" + str(i + 1)]
             agent2 = models_dict["agent" + str(j + 1)]
-            domain = f'Train Set: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
-            _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
+            # domain = f'Train Set: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
+            # _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
             domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
             _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
 
@@ -2099,8 +2099,8 @@ def run():
                 for _, p in enumerate(num_agents_per_community):
                     idx = offset + p - 1  # Select last agent from each community to play with itself
                     key = "agent" + str(idx + 1)
-                    dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                        models_dict[key], frozen_agents[key], FLAGS.dataset_path, True, dev_accuracy_id, logger, flogger, f'Train Set, Pool {_ + 1}, agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+                    # dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                    #     models_dict[key], frozen_agents[key], FLAGS.dataset_path, True, dev_accuracy_id, logger, flogger, f'Train Set, Pool {_ + 1}, agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
                     dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
                         models_dict[key], frozen_agents[key], FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, f'In Domain, Pool {_ + 1}, agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
                     offset += p

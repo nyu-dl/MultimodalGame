@@ -816,13 +816,9 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
     dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
     dev_accuracy_log['total_acc_atl1_com'].append(atleast1_accuracy_com)
     logger.log(key=domain + " Development Accuracy, both right, no comms", val=dev_accuracy_log['total_acc_both_nc'][-1], step=step)
-    logger.log(key=domain + " Development Accuracy CHECK, both right, no comms", val=total_accuracy_nc, step=step)
     logger.log(key=domain + "Development Accuracy, both right, after comms", val=dev_accuracy_log['total_acc_both_com'][-1], step=step)
-    logger.log(key=domain + "Development Accuracy CHECK, both right, after comms", val=total_accuracy_com, step=step)
     logger.log(key=domain + "Development Accuracy, at least 1 right, no comms", val=dev_accuracy_log['total_acc_atl1_nc'][-1], step=step)
-    logger.log(key=domain + "Development Accuracy CHECK, at least 1 right, no comms", val=atleast1_accuracy_nc, step=step)
     logger.log(key=domain + "Development Accuracy, at least 1 right, after comms", val=dev_accuracy_log['total_acc_atl1_com'][-1], step=step)
-    logger.log(key=domain + "Development Accuracy CHECK, at least 1 right, after comms", val=atleast1_accuracy_com, step=step)
     logger.log(key=domain + "Conversation Length A1 (avg)",
                val=extra['conversation_lengths_1_mean'], step=step)
     logger.log(key=domain + "Conversation Length A1 (std)",
@@ -874,6 +870,15 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
         epoch, step, i_batch, domain, dev_accuracy_log['total_acc_atl1_nc'][-1]))
     flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, at least 1 right, after comms: {}".format(
         epoch, step, i_batch, domain, dev_accuracy_log['total_acc_atl1_com'][-1]))
+
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy CHECK, both right, no comms: {}".format(
+        epoch, step, i_batch, domain, total_accuracy_nc))
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy CHECK, both right, after comms: {}".format(
+        epoch, step, i_batch, domain, total_accuracy_com))
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy CHECK, at least right, no comms: {}".format(
+        epoch, step, i_batch, domain, atleast1_accuracy_nc))
+    flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy CHECK, at least 1 right, after comms: {}".format(
+        epoch, step, i_batch, domain, atleast1_accuracy_com))
 
     flogger.Log("Epoch: {} Step: {} Batch: {} {} Conversation Length 1 (avg/std): {}/{}".format(
         epoch, step, i_batch, domain, extra['conversation_lengths_1_mean'], extra['conversation_lengths_1_std']))

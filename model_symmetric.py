@@ -815,14 +815,14 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
     dev_accuracy_log['total_acc_both_com'].append(total_accuracy_com)
     dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
     dev_accuracy_log['total_acc_atl1_com'].append(atleast1_accuracy_com)
-    logger.log(key=domain + " Development Accuracy, both right, no comms",
-               val=dev_accuracy_log['total_acc_both_nc'][-1], step=step)
-    logger.log(key=domain + "Development Accuracy, both right, after comms",
-               val=dev_accuracy_log['total_acc_both_com'][-1], step=step)
-    logger.log(key=domain + "Development Accuracy, at least 1 right, no comms",
-               val=dev_accuracy_log['total_acc_atl1_nc'][-1], step=step)
-    logger.log(key=domain + "Development Accuracy, at least 1 right, after comms",
-               val=dev_accuracy_log['total_acc_atl1_com'][-1], step=step)
+    logger.log(key=domain + " Development Accuracy, both right, no comms", val=dev_accuracy_log['total_acc_both_nc'][-1], step=step)
+    logger.log(key=domain + " Development Accuracy CHECK, both right, no comms", val=total_accuracy_nc, step=step)
+    logger.log(key=domain + "Development Accuracy, both right, after comms", val=dev_accuracy_log['total_acc_both_com'][-1], step=step)
+    logger.log(key=domain + "Development Accuracy CHECK, both right, after comms", val=total_accuracy_com, step=step)
+    logger.log(key=domain + "Development Accuracy, at least 1 right, no comms", val=dev_accuracy_log['total_acc_atl1_nc'][-1], step=step)
+    logger.log(key=domain + "Development Accuracy CHECK, at least 1 right, no comms", val=atleast1_accuracy_nc, step=step)
+    logger.log(key=domain + "Development Accuracy, at least 1 right, after comms", val=dev_accuracy_log['total_acc_atl1_com'][-1], step=step)
+    logger.log(key=domain + "Development Accuracy CHECK, at least 1 right, after comms", val=atleast1_accuracy_com, step=step)
     logger.log(key=domain + "Conversation Length A1 (avg)",
                val=extra['conversation_lengths_1_mean'], step=step)
     logger.log(key=domain + "Conversation Length A1 (std)",
@@ -929,7 +929,7 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
     return dev_accuracy_log, total_accuracy_com
 
 
-def eval_community(eval_list, models_dict, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=""):
+def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=""):
     eval_type = {1: "Self com, agent connected to multiple pools",
                  2: "Self com, agent connected to just one pool",
                  3: "Within pool com, different agents, trained together",
@@ -943,8 +943,10 @@ def eval_community(eval_list, models_dict, dataset_path, in_domain_eval, dev_acc
         for (i, j) in pair:
             agent1 = models_dict["agent" + str(i + 1)]
             agent2 = models_dict["agent" + str(j + 1)]
-            domain = f'Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
-            _, _ = get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
+            domain = f'Train Set: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
+            _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
+            domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
+            _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
 
 
 def corrupt_message(corrupt_region, agent, binary_message):
@@ -1581,7 +1583,7 @@ def run():
                                           'total_acc_atl1_com': []  # % at least 1 agent right after comms
                                           })
         if FLAGS.agent_communities:
-            eval_community(eval_agent_list, models_dict, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+            eval_community(eval_agent_list, models_dict, dev_accuracy_id[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
         else:
             # For the pairs of agents calculate results
             # Applies to both pools of agents and an agent pair
@@ -2083,13 +2085,15 @@ def run():
 
             # Report in domain development accuracy when training agent communities
             if FLAGS.agent_communities and step % FLAGS.log_community_eval == 0:
-                eval_community(eval_agent_list, models_dict, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+                eval_community(eval_agent_list, models_dict, dev_accuracy_id_pairs[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
 
                 # Log how much the language has changed by measuring the performance of one agent from each pool playing a frozen version of itself.
                 offset = 0
                 for _, p in enumerate(num_agents_per_community):
                     idx = offset + p - 1  # Select last agent from each community to play with itself
                     key = "agent" + str(idx + 1)
+                    dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
+                        models_dict[key], frozen_agents[key], FLAGS.dataset_path, True, dev_accuracy_id, logger, flogger, f'Train Set, Pool {_ + 1}, current version of agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
                     dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
                         models_dict[key], frozen_agents[key], FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, f'In Domain, Pool {_ + 1}, current version of agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
                     offset += p
@@ -2099,6 +2103,8 @@ def run():
                 for i in range(FLAGS.num_agents):
                     agent = models_dict["agent" + str(i + 1)]
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
+                    dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
+                        agent, agent, FLAGS.dataset_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: Train Set", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
                     dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
                         agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
 

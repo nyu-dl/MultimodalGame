@@ -119,7 +119,7 @@ def torch_load_communities(filenames, num_agents_per_community, models_dict, opt
                 key_0 = "optimizer_agent" + str(i_0 + 1)
                 key = "optimizer_agent" + str(i + 1)
                 optimizers_dict[key_0].load_state_dict(checkpoint['optimizers'][key])
-            debuglogger.info(f'Loading agents {offset + 1} - {offset + num} from checkpoint {f}')
+            debuglogger.info(f'Loaded agents {offset + 1} - {offset + num} from checkpoint {f}')
             debuglogger.info(f'Loaded at step {data["step"]} and best dev acc {data["best_dev_acc"]}')
         else:
             debuglogger.info(f'No checkpoint given for agents {offset + 1} - {offset + num}, training from scratch...')

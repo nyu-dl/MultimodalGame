@@ -2100,9 +2100,9 @@ def run():
                     idx = offset + p - 1  # Select last agent from each community to play with itself
                     key = "agent" + str(idx + 1)
                     dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                        models_dict[key], frozen_agents[key], FLAGS.dataset_path, True, dev_accuracy_id, logger, flogger, f'Train Set, Pool {_ + 1}, current version of agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+                        models_dict[key], frozen_agents[key], FLAGS.dataset_path, True, dev_accuracy_id, logger, flogger, f'Train Set, Pool {_ + 1}, agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
                     dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                        models_dict[key], frozen_agents[key], FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, f'In Domain, Pool {_ + 1}, current version of agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+                        models_dict[key], frozen_agents[key], FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, f'In Domain, Pool {_ + 1}, agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
                     offset += p
 
             # Report in domain development accuracy when agents communicate with themselves

@@ -114,6 +114,7 @@ def torch_load_communities(filenames, num_agents_per_community, models_dict, opt
                 i_0 = i + offset
                 key_0 = "agent" + str(i_0 + 1)
                 key = "agent" + str(i + 1)
+                debuglogger.info(f'Loading agents {key_0}/{key} from checkpoint {f}')
                 models_dict[key_0].load_state_dict(checkpoint['models'][key])
                 key_0 = "optimizer_agent" + str(i_0 + 1)
                 key = "optimizer_agent" + str(i + 1)

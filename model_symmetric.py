@@ -1540,6 +1540,8 @@ def run():
     if FLAGS.cuda:
         for m in models_dict.values():
             m.cuda()
+        for m in frozen_agents.values():
+            m.cuda()
         for o in optimizers_dict.values():
             recursively_set_device(o.state_dict(), gpu=0)
 

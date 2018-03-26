@@ -140,7 +140,7 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
                 if i != j:
                     i_0 = i + offset
                     j_0 = j + offset
-                    if train_matrix[i_0][j_0] > 0:
+                    if train_matrix[i_0][j_0] > 0 or train_matrix[j_0][i_0]:
                         c_p_3.append((i_0, j_0))
                         total_combinations += 1
                     else:
@@ -161,7 +161,7 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
         for i in range(prev_p, curr_p):
             cross_connected = False
             for j in range(prev_p):
-                if train_matrix[i][j] > 0:
+                if train_matrix[i][j] > 0 or train_matrix[j][i] > 0:
                     cross_connected = True
                     c_p_5.append((i, j))
                     total_combinations += 1
@@ -169,7 +169,7 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
                     c_p_6.append((i, j))
                     total_combinations += 1
             for j in range(curr_p, total_agents):
-                if train_matrix[i][j] > 0:
+                if train_matrix[i][j] > 0 or train_matrix[j][i] > 0:
                     cross_connected = True
                     c_p_5.append((i, j))
                     total_combinations += 1

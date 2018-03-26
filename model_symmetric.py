@@ -2217,7 +2217,7 @@ def flags():
     gflags.DEFINE_integer("log_interval", 50, "")
     gflags.DEFINE_integer("log_dev", 1000, "")
     gflags.DEFINE_integer("log_self_com", 10000, "")
-    gflags.DEFINE_integer("log_community_eval", 1000, "")
+    gflags.DEFINE_integer("log_community_eval", 10000, "")
 
     # Data settings
     gflags.DEFINE_integer("wv_dim", 100, "Dimension of the word vectors")

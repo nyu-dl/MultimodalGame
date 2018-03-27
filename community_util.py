@@ -23,7 +23,7 @@ def sample_agents(train_probs, agent_idx_list):
     return (agent1, agent2)
 
 
-def build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_pool_connect_p, intra_inter_ratio=1.0):
+def build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_pool_connect_p, adjust_train_ratio, intra_inter_ratio=1.0):
     '''Builds a connectivity matrix over multiple pools of agents. Returns a probability distribution over all possible agent connections in the population (across multiple pools) and a mapping from ints to agent pairs
 
     Params:
@@ -31,6 +31,7 @@ def build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_po
     community_type: community structure - "hub_spoke" or "dense"
     intra_pool_connect_p: list containing percentages of agents in a pool that should be connected with other agents in the same pool
     inter_pool_connect_p: percentage of agents in a pool that should be connected with agents in the other pools
+    adjust_train_ratio: whether to adjust the ratio of inter:intra training
     inter_intra_ratio: ratio of within pool to between pool training samples. Default is 1.0
 
     Returns:
@@ -82,9 +83,9 @@ def build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_po
         if total_interpool == 0:
             debuglogger.warn(f'No inter pool connections, exiting (comment out this line in community_util.py if this is what you are after)...')
             sys.exit()
-        # Adjust to correct training ratio between intra and inter pool
+        # Adjust if desired to correct training ratio between intra and inter pool
         cur_ratio = total_intrapool / total_interpool
-        if total_interpool > 0 and total_intrapool > 0:
+        if adjust_train_ratio and total_interpool > 0 and total_intrapool > 0:
             inter_train_matrix *= cur_ratio
             inter_train_matrix /= intra_inter_ratio
             cur_ratio = total_intrapool / np.sum(inter_train_matrix)

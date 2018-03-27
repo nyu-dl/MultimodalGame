@@ -1514,7 +1514,7 @@ def run():
     # Create additional data structures if training with agent communites
     # These handle to sampling of agents during training, and selection of agent pairs when evaluating of the dev set
     if FLAGS.agent_communities:
-        (train_vec_prob, agent_idx_list) = build_train_matrix(num_agents_per_community, FLAGS.community_type, intra_pool_connect_p, FLAGS.inter_pool_connect_p, FLAGS.intra_inter_ratio)
+        (train_vec_prob, agent_idx_list) = build_train_matrix(num_agents_per_community, FLAGS.community_type, intra_pool_connect_p, FLAGS.inter_pool_connect_p, FLAGS.ratio_adjust, FLAGS.intra_inter_ratio)
         eval_agent_list = build_eval_list(num_agents_per_community, FLAGS.community_type, train_vec_prob)
 
     # Training metrics
@@ -2281,6 +2281,7 @@ def flags():
     gflags.DEFINE_list("num_agents_per_community", [5, 5], "Number of agents per community. Specify one per community, can be different")
     gflags.DEFINE_list("intra_pool_connect_p", [1.0, 1.0], "Percentage of intra pool connectivity. Specify one value per community, can be different")
     gflags.DEFINE_float("inter_pool_connect_p", 0.1, "Percentage of inter pool connectvity. Specify one value")
+    gflags.DEFINE_integer("ratio_adjust", 1, "Whether to adjust the inter:intra training ratio")
     gflags.DEFINE_float("intra_inter_ratio", 1.0, "Ratio of intra to inter pool training. Default is 1.0. Agents across pools and within pools will be trained equally.")
     gflags.DEFINE_float("first_msg", 0, "Value to fill the first message with")
     gflags.DEFINE_boolean("visual_attn", False, "agents attends over image")

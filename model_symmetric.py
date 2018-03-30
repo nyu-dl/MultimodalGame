@@ -941,17 +941,31 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
                  4: "Within pool com, different agents, never trained together",
                  5: "Cross pool com, different agents, trained together",
                  6: "Cross pool com, different agents, never trained together"}
-    for num, pair in enumerate(eval_list):
+    for num, items in enumerate(eval_list):
         logger.log(key="Dev accuracy: ",
                    val=eval_type[num + 1], step=step)
         flogger.Log(f'Dev accuracy: {eval_type[num + 1]}, step: {step}')
-        for (i, j) in pair:
-            agent1 = models_dict["agent" + str(i + 1)]
-            agent2 = models_dict["agent" + str(j + 1)]
-            # domain = f'Train Set: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
-            # _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
-            domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
-            _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
+        if type(items) is list:
+            for nested in items:
+                for elem in nested:
+                    if elem is None:
+                        pass
+                    else:
+                        (i, j) = elem
+                        agent1 = models_dict["agent" + str(i + 1)]
+                        agent2 = models_dict["agent" + str(j + 1)]
+                        domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
+                        _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
+        else:
+            for elem in items:
+                if elem is None:
+                    pass
+                else:
+                    (i, j) = elem
+                    agent1 = models_dict["agent" + str(i + 1)]
+                    agent2 = models_dict["agent" + str(j + 1)]
+                    domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
+                    _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
 
 
 def corrupt_message(corrupt_region, agent, binary_message):

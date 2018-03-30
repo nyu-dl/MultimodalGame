@@ -1457,6 +1457,9 @@ def run():
         if FLAGS.num_communities != len(FLAGS.intra_pool_connect_p):
             flogger.Log("Number of communities doesn't match length of intra community connectivity list")
             sys.exit()
+        if FLAGS.community_type == "chain" and FLAGS.num_communities <= 2:
+            flogger.Log("There must be at least 3 communities to train in a chain")
+            sys.exit()
         num_agents_per_community = [int(x) for x in FLAGS.num_agents_per_community]
         intra_pool_connect_p = [float(x) for x in FLAGS.intra_pool_connect_p]
         if FLAGS.num_agents != sum(num_agents_per_community):

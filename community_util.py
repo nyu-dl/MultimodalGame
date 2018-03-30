@@ -74,10 +74,10 @@ def build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_po
                 cur_end += pools_num[i]  # current pool size
                 prev_start = cur_start - pools_num[i - 1] if i > 0 else 0
                 next_end = cur_end + pools_num[i + 1] if i < len(pools_num) - 1 else cur_end
-                debuglogger.info(f'prev start: {prev_start}, cur_start: {cur_start}, cur_end: {cur_end}, next_end: {next_end}')
+                debuglogger.debug(f'prev start: {prev_start}, cur_start: {cur_start}, cur_end: {cur_end}, next_end: {next_end}')
                 for i in range(cur_start, cur_end):
                     for j in range(prev_start, cur_start):
-                        print(f'i: {i}, j: {j}')
+                        # print(f'i: {i}, j: {j}')
                         if np.random.rand() < inter_pool_connect_p:
                             inter_train_matrix[i][j] = 1
                     for j in range(cur_end, next_end):
@@ -153,7 +153,9 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
     c_3 = []  # within pool communication, different agents, trained together
     c_4 = []  # within pool communication, different agents, never trained together
     c_5 = []  # cross pool communication, different agents, trained together
+    c_5_chain = []
     c_6 = []  # cross pool communication, different agents, never trained together
+    c_6_chain = []
     offset = 0
     for p in pools_num:
         c_p_3 = []
@@ -163,7 +165,7 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
                 if i != j:
                     i_0 = i + offset
                     j_0 = j + offset
-                    if train_matrix[i_0][j_0] > 0 or train_matrix[j_0][i_0]:
+                    if train_matrix[i_0][j_0] > 0 or train_matrix[j_0][i_0] > 0:
                         c_p_3.append((i_0, j_0))
                         total_combinations += 1
                     else:
@@ -174,11 +176,23 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
         c_4.append(c_p_4)
     prev_p = 0
     curr_p = 0
+    pool_map = []
+    idx = 0
+    for p in pools_num:
+        for _ in range(p):
+            pool_map.append(idx)
+        idx += 1
+    print(f'Pool map: {pool_map}')
     for p in pools_num:
         c_p_1 = []
         c_p_2 = []
         c_p_5 = []
+        c_p_5_prev = []  # for chain community structure
+        c_p_5_next = []  # for chain community structure
         c_p_6 = []
+        c_p_6_chain = []  # for chain community structure
+        for _ in range(len(pools_num)):
+            c_p_6_chain.append([])
         curr_p += p
         debuglogger.debug(f'prev p: {prev_p}, current p: {curr_p}')
         for i in range(prev_p, curr_p):
@@ -187,17 +201,21 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
                 if train_matrix[i][j] > 0 or train_matrix[j][i] > 0:
                     cross_connected = True
                     c_p_5.append((i, j))
+                    c_p_5_prev.append((i, j))
                     total_combinations += 1
                 else:
                     c_p_6.append((i, j))
+                    c_p_6_chain[pool_map[j]].append((i, j))
                     total_combinations += 1
             for j in range(curr_p, total_agents):
                 if train_matrix[i][j] > 0 or train_matrix[j][i] > 0:
                     cross_connected = True
                     c_p_5.append((i, j))
+                    c_p_5_next.append((i, j))
                     total_combinations += 1
                 else:
                     c_p_6.append((i, j))
+                    c_p_6_chain[pool_map[j]].append((i, j))
                     total_combinations += 1
             if cross_connected:
                 c_p_1.append((i, i))
@@ -208,22 +226,55 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
         c_1.append(c_p_1)
         c_2.append(c_p_2)
         c_5.append(c_p_5)
+        c_5_chain.append((c_p_5_prev, c_p_5_next))
         c_6.append(c_p_6)
+        c_6_chain.append(c_p_6_chain)
         prev_p = curr_p
     debuglogger.info(f'Total combinations: {total_combinations}')
     debuglogger.info(f'Self communication: multiple pools: {sum([len(x) for x in c_1])}, one pool: {sum([len(x) for x in c_2])}')
     debuglogger.info(f'Within pool comms: trained together: {sum([len(x) for x in c_3])}, not trained together: {sum([len(x) for x in c_4])}')
     debuglogger.info(f'Cross pool comms: trained together: {sum([len(x) for x in c_5])}, not trained together: {sum([len(x) for x in c_6])}')
     choices = [c_1, c_2, c_3, c_4, c_5, c_6]
+    debuglogger.debug(f'c_5_chain: {c_5_chain}')
+    debuglogger.debug(f'c_6_chain: {c_6_chain}')
     agent_idxs = []
     for i, c in enumerate(choices):
         debuglogger.debug(f'Type {i + 1}: {c}')
         temp = []
-        # To ensure one example from each pool for each type
-        for pool in c:
-            if len(pool) > 0:
-                idx = np.random.choice(list(range(len(pool))))
-                temp.append(pool[idx])
+        if community_type == "chain" and i == 4:
+            for pool in c_5_chain:
+                prev_pool = pool[0]
+                t = []
+                if len(prev_pool) > 0:
+                    idx = np.random.choice(list(range(len(prev_pool))))
+                    t.append(prev_pool[idx])
+                else:
+                    t.append(None)
+                next_pool = pool[1]
+                if len(next_pool) > 0:
+                    idx = np.random.choice(list(range(len(next_pool))))
+                    t.append(next_pool[idx])
+                else:
+                    t.append(None)
+                temp.append(t)
+        elif community_type == "chain" and i == 5:
+            for pool in c_6_chain:
+                t = []
+                for cur_pool in pool:
+                    if len(cur_pool) > 0:
+                        idx = np.random.choice(list(range(len(cur_pool))))
+                        t.append(cur_pool[idx])
+                    else:
+                        t.append(None)
+                temp.append(t)
+        else:
+            # To ensure one example from each pool for each type
+            for pool in c:
+                if len(pool) > 0:
+                    idx = np.random.choice(list(range(len(pool))))
+                    temp.append(pool[idx])
+                else:
+                    temp.append(None)
         agent_idxs.append(temp)
     debuglogger.info(f'Train matrix: {torch.from_numpy(train_matrix)}')
     debuglogger.info(f'Eval agent combinations: {agent_idxs}')
@@ -231,10 +282,10 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
 
 
 if __name__ == "__main__":
-    pools_num = [3, 5, 3]
-    community_type = "dense"
+    pools_num = [5, 5, 5]
+    community_type = "chain"
     intra_pool_connect_p = [1.0, 1.0, 1.0]
-    inter_pool_connect_p = 0.5
+    inter_pool_connect_p = 0.2
     intra_inter_ratio = 1.0
     (train_vec_prob, agent_idx_list) = build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_pool_connect_p, intra_inter_ratio)
     eval_agent_idxs = build_eval_list(pools_num, community_type, train_vec_prob)

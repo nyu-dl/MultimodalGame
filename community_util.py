@@ -47,7 +47,8 @@ def build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_po
     if community_type == "hub_spoke":
         debuglogger.warn(f'Hub and spoke model not implemented yet, select "dense"')
         sys.exit()
-    elif community_type == "dense":
+    elif community_type == "dense" or community_type == "chain":
+        debuglogger.info(f'Building a {community_type} community with {total_agents} agents organized into {len(pools_num)} groups with {pools_num} agents')
         # fill intra_pool connectivity
         offset = 0
         for p, prob in zip(pools_num, intra_pool_connect_p):
@@ -64,19 +65,40 @@ def build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_po
         total_intrapool = np.sum(intra_train_matrix)
         debuglogger.info(f'Total intrapool: {total_intrapool}')
         # fill inter_pool connectivity
-        prev_p = 0
-        curr_p = 0
-        for p in pools_num:
-            curr_p += p
-            debuglogger.debug(f'prev p: {prev_p}, current p: {curr_p}')
-            for i in range(prev_p, curr_p):
-                for j in range(prev_p):
-                    if np.random.rand() < inter_pool_connect_p:
-                        inter_train_matrix[i][j] = 1
-                for j in range(curr_p, total_agents):
-                    if np.random.rand() < inter_pool_connect_p:
-                        inter_train_matrix[i][j] = 1
-            prev_p = curr_p
+        if community_type == "chain":
+            prev_start = 0
+            cur_start = 0
+            cur_end = 0
+            next_end = pools_num[0]
+            for i in range(len(pools_num)):
+                cur_end += pools_num[i]  # current pool size
+                prev_start = cur_start - pools_num[i - 1] if i > 0 else 0
+                next_end = cur_end + pools_num[i + 1] if i < len(pools_num) - 1 else cur_end
+                debuglogger.info(f'prev start: {prev_start}, cur_start: {cur_start}, cur_end: {cur_end}, next_end: {next_end}')
+                for i in range(cur_start, cur_end):
+                    for j in range(prev_start, cur_start):
+                        print(f'i: {i}, j: {j}')
+                        if np.random.rand() < inter_pool_connect_p:
+                            inter_train_matrix[i][j] = 1
+                    for j in range(cur_end, next_end):
+                        print(f'i: {i}, j: {j}')
+                        if np.random.rand() < inter_pool_connect_p:
+                            inter_train_matrix[i][j] = 1
+                cur_start = cur_end
+        else:
+            prev_p = 0
+            curr_p = 0
+            for p in pools_num:
+                curr_p += p
+                debuglogger.debug(f'prev p: {prev_p}, current p: {curr_p}')
+                for i in range(prev_p, curr_p):
+                    for j in range(prev_p):
+                        if np.random.rand() < inter_pool_connect_p:
+                            inter_train_matrix[i][j] = 1
+                    for j in range(curr_p, total_agents):
+                        if np.random.rand() < inter_pool_connect_p:
+                            inter_train_matrix[i][j] = 1
+                prev_p = curr_p
         debuglogger.info(f'Inter pool connect: {torch.from_numpy(inter_train_matrix)}')
         total_interpool = np.sum(inter_train_matrix)
         debuglogger.info(f'Total interpool: {total_interpool}')
@@ -209,10 +231,10 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
 
 
 if __name__ == "__main__":
-    pools_num = [3, 3]
+    pools_num = [3, 5, 3]
     community_type = "dense"
-    intra_pool_connect_p = [1.0, 1.0]
-    inter_pool_connect_p = 0.1
+    intra_pool_connect_p = [1.0, 1.0, 1.0]
+    inter_pool_connect_p = 0.5
     intra_inter_ratio = 1.0
     (train_vec_prob, agent_idx_list) = build_train_matrix(pools_num, community_type, intra_pool_connect_p, inter_pool_connect_p, intra_inter_ratio)
     eval_agent_idxs = build_eval_list(pools_num, community_type, train_vec_prob)

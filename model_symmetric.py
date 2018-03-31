@@ -945,7 +945,8 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
         logger.log(key="Dev accuracy: ",
                    val=eval_type[num + 1], step=step)
         flogger.Log(f'Dev accuracy: {eval_type[num + 1]}, step: {step}')
-        if type(items) is list:
+        print(items)
+        if type(items[0]) is list:
             for nested in items:
                 for elem in nested:
                     if elem is None:

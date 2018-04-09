@@ -52,21 +52,21 @@ def Variable(*args, **kwargs):
     return var
 
 
-def flipout(binary, p):
-    """
-    Args:
-        binary: Tensor of binary values.
-        p: Probability of flipping a binary value.
-    Output:
-        outp: Tensor with same size as `binary` where bits have been
-            flipped with probability `p`.
-    """
-    mask = torch.FloatTensor(binary.size()).fill_(p).numpy()
-    mask = Variable(torch.from_numpy(
-        (np.random.rand(*mask.shape) < mask).astype('float32')))
-    outp = (binary - mask).abs()
-
-    return outp
+# def flipout(binary, p):
+#     """
+#     Args:
+#         binary: Tensor of binary values.
+#         p: Probability of flipping a binary value.
+#     Output:
+#         outp: Tensor with same size as `binary` where bits have been
+#             flipped with probability `p`.
+#     """
+#     mask = torch.FloatTensor(binary.size()).fill_(p).numpy()
+#     mask = Variable(torch.from_numpy(
+#         (np.random.rand(*mask.shape) < mask).astype('float32')))
+#     outp = (binary - mask).abs()
+#
+#     return outp
 
 
 def loglikelihood(log_prob, target):
@@ -1314,14 +1314,14 @@ def multistep_loss_bas(baseline_scores, rewards, masks):
     return loss
 
 
-def bin_to_alpha(binary):
-    ret = []
-    interval = 5
-    offset = 65
-    for i in range(0, len(binary), interval):
-        val = int(binary[i:i + interval], 2)
-        ret.append(unichr(offset + val))
-    return " ".join(ret)
+# def bin_to_alpha(binary):
+#     ret = []
+#     interval = 5
+#     offset = 65
+#     for i in range(0, len(binary), interval):
+#         val = int(binary[i:i + interval], 2)
+#         ret.append(unichr(offset + val))
+#     return " ".join(ret)
 
 
 def calculate_accuracy(prediction_dist, target, batch_size, top_k):
@@ -1345,60 +1345,60 @@ def calculate_accuracy(prediction_dist, target, batch_size, top_k):
     return accuracy, correct, top_1
 
 
-def log_exchange(s, message_1, message_2, log_type="Train:"):
-    # TODO - check makes sense with symmetric agents
-    log_string = log_type
-    s_masks_1, s_feats_1, s_probs_1 = s[0]
-    s_masks_2, s_feats_2, s_probs_2 = s[1]
-    feats_1, probs_1 = message_1
-    feats_2, probs_2 = message_2
-    current_exchange = len(feats_1)
-    for i_sample in range(FLAGS.exchange_samples):
-        prev_1 = torch.FloatTensor(FLAGS.m_dim).fill_(0)
-        prev_2 = torch.FloatTensor(FLAGS.m_dim).fill_(0)
-        for i_exchange in range(current_exchange):
-            probs_1_i = probs_1[i_exchange][i_sample].data.tolist(
-            )
-            spark_1 = sparks(
-                [1] + probs_1_i)[1:].encode('utf-8')
-            probs_2_i = probs_2[i_exchange][i_sample].data.tolist(
-            )
-            spark_2 = sparks(
-                [1] + probs_2_i)[1:].encode('utf-8')
-            s_probs_1_i = s_probs_1[i_exchange][i_sample].data.tolist(
-            )
-            s_spark_1 = sparks(
-                [1] + s_probs_1_i)[1:].encode('utf-8')
-
-            binary_1 = feats_1[i_exchange][i_sample].data.cpu(
-            )
-            hamming_1 = (prev_1 - binary_1).abs().sum()
-            prev_1 = binary_1
-            binary_2 = feats_2[i_exchange][i_sample].data.cpu(
-            )
-            hamming_2 = (prev_2 - binary_2).abs().sum()
-            prev_2 = binary_2
-
-            msg_1 = "".join(
-                map(str, map(int, binary_1.tolist())))
-            msg_2 = "".join(
-                map(str, map(int, binary_2.tolist())))
-            if FLAGS.use_alpha:
-                msg_1 = bin_to_alpha(msg_1)
-                msg_2 = bin_to_alpha(msg_2)
-            if i_exchange == 0:
-                log_string += "\n{:>3}".format(i_sample)
-            else:
-                log_string += "\n   "
-            log_string += "        {}".format(spark_1)
-            log_string += "           {}    {}".format(
-                s_spark_1, spark_2)
-            log_string += "\n    {:>3} S: {} {:4}".format(
-                i_exchange, msg_1, hamming_1)
-            log_string += "    s={} R: {} {:4}".format(
-                s_masks_1[1:][i_exchange][i_sample].data[0], msg_2, hamming_2)
-    log_string += "\n"
-    return log_string
+# def log_exchange(s, message_1, message_2, log_type="Train:"):
+#     # TODO - check makes sense with symmetric agents
+#     log_string = log_type
+#     s_masks_1, s_feats_1, s_probs_1 = s[0]
+#     s_masks_2, s_feats_2, s_probs_2 = s[1]
+#     feats_1, probs_1 = message_1
+#     feats_2, probs_2 = message_2
+#     current_exchange = len(feats_1)
+#     for i_sample in range(FLAGS.exchange_samples):
+#         prev_1 = torch.FloatTensor(FLAGS.m_dim).fill_(0)
+#         prev_2 = torch.FloatTensor(FLAGS.m_dim).fill_(0)
+#         for i_exchange in range(current_exchange):
+#             probs_1_i = probs_1[i_exchange][i_sample].data.tolist(
+#             )
+#             spark_1 = sparks(
+#                 [1] + probs_1_i)[1:].encode('utf-8')
+#             probs_2_i = probs_2[i_exchange][i_sample].data.tolist(
+#             )
+#             spark_2 = sparks(
+#                 [1] + probs_2_i)[1:].encode('utf-8')
+#             s_probs_1_i = s_probs_1[i_exchange][i_sample].data.tolist(
+#             )
+#             s_spark_1 = sparks(
+#                 [1] + s_probs_1_i)[1:].encode('utf-8')
+#
+#             binary_1 = feats_1[i_exchange][i_sample].data.cpu(
+#             )
+#             hamming_1 = (prev_1 - binary_1).abs().sum()
+#             prev_1 = binary_1
+#             binary_2 = feats_2[i_exchange][i_sample].data.cpu(
+#             )
+#             hamming_2 = (prev_2 - binary_2).abs().sum()
+#             prev_2 = binary_2
+#
+#             msg_1 = "".join(
+#                 map(str, map(int, binary_1.tolist())))
+#             msg_2 = "".join(
+#                 map(str, map(int, binary_2.tolist())))
+#             if FLAGS.use_alpha:
+#                 msg_1 = bin_to_alpha(msg_1)
+#                 msg_2 = bin_to_alpha(msg_2)
+#             if i_exchange == 0:
+#                 log_string += "\n{:>3}".format(i_sample)
+#             else:
+#                 log_string += "\n   "
+#             log_string += "        {}".format(spark_1)
+#             log_string += "           {}    {}".format(
+#                 s_spark_1, spark_2)
+#             log_string += "\n    {:>3} S: {} {:4}".format(
+#                 i_exchange, msg_1, hamming_1)
+#             log_string += "    s={} R: {} {:4}".format(
+#                 s_masks_1[1:][i_exchange][i_sample].data[0], msg_2, hamming_2)
+#     log_string += "\n"
+#     return log_string
 
 
 def get_classification_loss_and_stats(predictions, targets):
@@ -1654,16 +1654,16 @@ def run():
                     dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
                         agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_self_com_A_{i + 1}')
         sys.exit()
-    elif FLAGS.binary_only:
-        if not os.path.exists(FLAGS.checkpoint):
-            raise Exception("Must provide valid checkpoint.")
-        # TODO fix for new agents
-        debuglogger.warning(f'Extract binary not updated for new agents yet')
-        sys.exit()
-        extract_binary(FLAGS, load_hdf5, exchange, FLAGS.dev_file, FLAGS.batch_size_dev, epoch,
-                       FLAGS.shuffle_dev, FLAGS.cuda, FLAGS.top_k_dev,
-                       sender, receiver, desc_dev_dict, map_labels_dev, FLAGS.experiment_name)
-        sys.exit()
+    # elif FLAGS.binary_only:
+    #     if not os.path.exists(FLAGS.checkpoint):
+    #         raise Exception("Must provide valid checkpoint.")
+    #     # TODO fix for new agents
+    #     debuglogger.warning(f'Extract binary not updated for new agents yet')
+    #     sys.exit()
+    #     extract_binary(FLAGS, load_hdf5, exchange, FLAGS.dev_file, FLAGS.batch_size_dev, epoch,
+    #                    FLAGS.shuffle_dev, FLAGS.cuda, FLAGS.top_k_dev,
+    #                    sender, receiver, desc_dev_dict, map_labels_dev, FLAGS.experiment_name)
+    #     sys.exit()
 
     # Training loop
     while epoch < FLAGS.max_epoch:
@@ -2018,21 +2018,21 @@ def run():
                     log_ent_agent2_y += "\n"
                     flogger.Log(log_ent_agent2_y)
 
-                # Optionally print sampled and inferred binary vectors from
-                # most recent exchange.
-                if FLAGS.exchange_samples > 0:
-
-                    log_train = log_exchange(
-                        s, message_1, message_2, current_exchange, log_type="Train:")
-                    flogger.Log(log_train)
-
-                    exchange_args["train"] = False
-                    s, message_1, message_2, y_all, r = exchange(
-                        agent1, agent2, exchange_args)
-
-                    log_train = log_exchange(
-                        s, message_1, message_2, current_exchange, log_type="Eval:")
-                    flogger.Log(log_train)
+                # # Optionally print sampled and inferred binary vectors from
+                # # most recent exchange.
+                # if FLAGS.exchange_samples > 0:
+                #
+                #     log_train = log_exchange(
+                #         s, message_1, message_2, current_exchange, log_type="Train:")
+                #     flogger.Log(log_train)
+                #
+                #     exchange_args["train"] = False
+                #     s, message_1, message_2, y_all, r = exchange(
+                #         agent1, agent2, exchange_args)
+                #
+                #     log_train = log_exchange(
+                #         s, message_1, message_2, current_exchange, log_type="Eval:")
+                #     flogger.Log(log_train)
 
                 # Agent 1
                 logger.log(key="Loss Agent 1 (Total)",
@@ -2244,7 +2244,7 @@ def flags():
     # Display settings
     gflags.DEFINE_string("env", "main", "")
     gflags.DEFINE_boolean("visdom", False, "")
-    gflags.DEFINE_boolean("use_alpha", False, "")
+    # gflags.DEFINE_boolean("use_alpha", False, "")
     gflags.DEFINE_string("experiment_name", None, "")
     gflags.DEFINE_integer("log_interval", 50, "")
     gflags.DEFINE_integer("log_dev", 1000, "")
@@ -2323,8 +2323,8 @@ def flags():
     gflags.DEFINE_boolean("attn_extra_context", False, "")
     gflags.DEFINE_integer("attn_context_dim", 4096, "")
     gflags.DEFINE_float("dropout", 0.3, "How much dropout to apply when training using the original image")
-    gflags.DEFINE_boolean("desc_attn", False, "agents attend over text")
-    gflags.DEFINE_integer("desc_attn_dim", 64, "text attention dim")
+    # gflags.DEFINE_boolean("desc_attn", False, "agents attend over text")
+    # gflags.DEFINE_integer("desc_attn_dim", 64, "text attention dim")
     gflags.DEFINE_integer("top_k_dev", 3, "Top-k error in development")
     gflags.DEFINE_integer("top_k_train", 3, "Top-k error in training")
 
@@ -2343,7 +2343,7 @@ def flags():
     gflags.DEFINE_float("baseline_loss_weight", 1.0, "")
 
     # Conversation settings
-    gflags.DEFINE_integer("exchange_samples", 1, "")
+    # gflags.DEFINE_integer("exchange_samples", 1, "")
     gflags.DEFINE_integer("max_exchange", 1, "")
     gflags.DEFINE_boolean("fixed_exchange", True, "")
     gflags.DEFINE_boolean(

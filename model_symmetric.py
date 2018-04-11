@@ -2100,7 +2100,7 @@ def run():
 
                     # Re-run in domain dev performance and log examples and analyze messages for a number of pairs of agents
                     # Time consuming to run, only run if dev_acc high enough
-                    if best_dev_acc > 0.7 and FLAGS.agent_pools:
+                    if best_dev_acc > 0.75 and FLAGS.agent_pools:
                         for i in range(FLAGS.num_agents - 1):
                             flogger.Log("Agent 1: {}".format(i + 1))
                             logger.log(key="Agent 1: ", val=i + 1, step=step)
@@ -2109,11 +2109,11 @@ def run():
                             logger.log(key="Agent 2: ", val=i + 2, step=step)
                             _agent2 = models_dict["agent" + str(i + 2)]
                             if i == 0:
-                                # Report in domain development accuracy and analyze messages and store examples
+                                # Report in domain development accuracy and store examples
                                 dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
                                     _agent1, _agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
                             else:
-                                # Report in domain development accuracy and checkpoint if best result
+                                # Report in domain development accuracy
                                 dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
                                     agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
 
@@ -2141,8 +2141,8 @@ def run():
                 for i in range(FLAGS.num_agents):
                     agent = models_dict["agent" + str(i + 1)]
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
-                    dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
-                        agent, agent, FLAGS.dataset_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: Train Set", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
+                    # dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
+                    #     agent, agent, FLAGS.dataset_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: Train Set", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
                     dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
                         agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
 

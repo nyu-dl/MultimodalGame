@@ -1741,7 +1741,7 @@ def run():
                 agent2 = agents[idx2]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx2 + 1)]
                 agent_idxs[1] = idx2 + 1
-            debuglogger.info(f'Agent 1: {agent_idxs[0]}, Agent 1: {agent_idxs[1]}')
+            debuglogger.debug(f'Agent 1: {agent_idxs[0]}, Agent 1: {agent_idxs[1]}')
 
             # Converted to Variable in get_classification_loss_and_stats
             target = batch["target"]

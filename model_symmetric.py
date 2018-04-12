@@ -1647,12 +1647,11 @@ def run():
                 dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
 
             # Report in domain development accuracy when agents communicate with themselves
-            if step % FLAGS.log_self_com == 0:
-                for i in range(FLAGS.num_agents):
-                    agent = models_dict["agent" + str(i + 1)]
-                    flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
-                    dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
-                        agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_self_com_A_{i + 1}')
+            for i in range(FLAGS.num_agents):
+                agent = models_dict["agent" + str(i + 1)]
+                flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
+                dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
+                    agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_self_com_A_{i + 1}')
         sys.exit()
     # elif FLAGS.binary_only:
     #     if not os.path.exists(FLAGS.checkpoint):

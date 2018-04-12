@@ -1731,8 +1731,13 @@ def run():
                 optimizer_agent1 = optimizers_dict["optimizer_agent" + str(idx + 1)]
                 agent_idxs[0] = idx + 1
                 old_idx = idx
-                while idx == old_idx:
+                if FLAGS.with_replacement:
+                    # Sampling second agent with replacement
                     idx = random.randint(0, len(agents) - 1)
+                else:
+                    # Sampling second agent without replacement
+                    while idx == old_idx:
+                        idx = random.randint(0, len(agents) - 1)
                 agent2 = agents[idx]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx + 1)]
                 agent_idxs[1] = idx + 1
@@ -1744,9 +1749,7 @@ def run():
                 agent2 = agents[idx2]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx2 + 1)]
                 agent_idxs[1] = idx2 + 1
-            elif FLAGS.num_agents == 1:
-                agent2 = copy.deepcopy(agents[0])
-            debuglogger.debug(f'Agent 1: {agent_idxs[0]}, Agent 1: {agent_idxs[1]}')
+            debuglogger.info(f'Agent 1: {agent_idxs[0]}, Agent 1: {agent_idxs[1]}')
 
             # Converted to Variable in get_classification_loss_and_stats
             target = batch["target"]
@@ -1936,15 +1939,18 @@ def run():
             loss_agent1 += FLAGS.baseline_loss_weight * loss_baseline_1
             loss_agent2 += FLAGS.baseline_loss_weight * loss_baseline_2
 
-            if FLAGS.num_agents == 1:
+            if FLAGS.num_agents == 1 or (agent_idxs[0] == agent_idxs[1]):
+                debuglogger.debug(f'Agent 1 and 2 are the same')
                 optimizer_agent1.zero_grad()
-                loss_agent1.backward()
+                # Get gradients from both sides of the exchange
+                loss_agent1.backward(retain_graph=True)
                 nn.utils.clip_grad_norm(agent1.parameters(), max_norm=1.)
                 loss_agent2.backward()
                 nn.utils.clip_grad_norm(agent2.parameters(), max_norm=1.)
-                # TODO Add gradient from agent 2 to agent 1
-                agent2 = copy.deepcopy(agent1)
+                # Only need to update agent1
+                optimizer_agent1.step()
             else:
+                debuglogger.debug(f'Different agents')
                 # Update agent1
                 optimizer_agent1.zero_grad()
                 loss_agent1.backward()
@@ -2318,6 +2324,7 @@ def flags():
     gflags.DEFINE_boolean("agent_pools", False,
                           "Whether to have a pool of agents to train instead of two fixed agents")
     gflags.DEFINE_integer("num_agents", 2, "How many agents total (single pool or community)")
+    gflags.DEFINE_boolean("with_replacement", False, "Whether to sample agents from pool with replacement")
     gflags.DEFINE_boolean("agent_communities", False,
                           "Whether to have a community of agents to train instead of two fixed agents")
     gflags.DEFINE_integer("num_communities", 2, "How many communities of agents")
@@ -2448,5 +2455,11 @@ if __name__ == '__main__':
     logging.basicConfig(format=FORMAT)
     debuglogger = logging.getLogger('main_logger')
     debuglogger.setLevel(FLAGS.debug_log_level)
-
+    if FLAGS.random_seed != -1:
+        random.seed(FLAGS.random_seed)
+        np.random.seed(FLAGS.random_seed)
+        torch.manual_seed(FLAGS.random_seed)
+    else:
+        random.seed()
+        np.random.seed()
     run()

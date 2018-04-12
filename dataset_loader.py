@@ -226,7 +226,6 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
 
     # Shuffle
     if shuffle:
-        random.seed(11 + random_seed)
         random.shuffle(order)
 
     # Generate batches

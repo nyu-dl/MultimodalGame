@@ -1450,11 +1450,8 @@ def run():
     eval_agent_list = None  # List of agent pairs to evaluate each dev eval
 
     # Check agent setup
-    if FLAGS.num_agents < 2:
-        flogger.Log("Only {} agents. There must be at least 2. Set FLAGS.num_agents".format(FLAGS.num_agents))
-        sys.exit()
-    elif FLAGS.num_agents > 2 and not (FLAGS.agent_pools or FLAGS.agent_communities):
-        flogger.Log("{} is too many agents. There can only be two if FLAGS.agent_pools is false".format(FLAGS.num_agents))
+    if FLAGS.num_agents > 2 and not (FLAGS.agent_pools or FLAGS.agent_communities):
+        flogger.Log("{} is too many agents. There can only be two if FLAGS.agent_pools and FLAGS.agent_communities are false".format(FLAGS.num_agents))
         sys.exit()
     if FLAGS.agent_pools and FLAGS.agent_communities:
         flogger.Log("You cannot train an agent pool and community at the same time. Please select one of the other")
@@ -1572,11 +1569,18 @@ def run():
         agent_idxs = [None, None]
     # Otherwise keep agents fixed for each batch
     else:
-        agent1 = agents[0]
-        agent2 = agents[1]
-        optimizer_agent1 = optimizers_dict["optimizer_agent1"]
-        optimizer_agent2 = optimizers_dict["optimizer_agent2"]
-        agent_idxs = [1, 2]
+        if FLAGS.num_agents == 1:
+            agent1 = agents[0]
+            agent2 = agents[0]
+            optimizer_agent1 = optimizers_dict["optimizer_agent1"]
+            optimizer_agent2 = optimizers_dict["optimizer_agent1"]
+            agent_idxs = [1, 1]
+        else:
+            agent1 = agents[0]
+            agent2 = agents[1]
+            optimizer_agent1 = optimizers_dict["optimizer_agent1"]
+            optimizer_agent2 = optimizers_dict["optimizer_agent2"]
+            agent_idxs = [1, 2]
 
     # Alternatives to training.
     if FLAGS.eval_only:
@@ -1740,6 +1744,8 @@ def run():
                 agent2 = agents[idx2]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx2 + 1)]
                 agent_idxs[1] = idx2 + 1
+            elif FLAGS.num_agents == 1:
+                agent2 = copy.deepcopy(agents[0])
             debuglogger.debug(f'Agent 1: {agent_idxs[0]}, Agent 1: {agent_idxs[1]}')
 
             # Converted to Variable in get_classification_loss_and_stats
@@ -1930,17 +1936,25 @@ def run():
             loss_agent1 += FLAGS.baseline_loss_weight * loss_baseline_1
             loss_agent2 += FLAGS.baseline_loss_weight * loss_baseline_2
 
-            # Update agent1
-            optimizer_agent1.zero_grad()
-            loss_agent1.backward()
-            nn.utils.clip_grad_norm(agent1.parameters(), max_norm=1.)
-            optimizer_agent1.step()
-
-            # Update agent2
-            optimizer_agent2.zero_grad()
-            loss_agent2.backward()
-            nn.utils.clip_grad_norm(agent2.parameters(), max_norm=1.)
-            optimizer_agent2.step()
+            if FLAGS.num_agents == 1:
+                optimizer_agent1.zero_grad()
+                loss_agent1.backward()
+                nn.utils.clip_grad_norm(agent1.parameters(), max_norm=1.)
+                loss_agent2.backward()
+                nn.utils.clip_grad_norm(agent2.parameters(), max_norm=1.)
+                # TODO Add gradient from agent 2 to agent 1
+                agent2 = copy.deepcopy(agent1)
+            else:
+                # Update agent1
+                optimizer_agent1.zero_grad()
+                loss_agent1.backward()
+                nn.utils.clip_grad_norm(agent1.parameters(), max_norm=1.)
+                optimizer_agent1.step()
+                # Update agent2
+                optimizer_agent2.zero_grad()
+                loss_agent2.backward()
+                nn.utils.clip_grad_norm(agent2.parameters(), max_norm=1.)
+                optimizer_agent2.step()
 
             # Print logs regularly
             if step % FLAGS.log_interval == 0:

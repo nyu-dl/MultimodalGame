@@ -1613,8 +1613,8 @@ def run():
                                           })
         if FLAGS.eval_xproduct:
             # Complete evaluation on all possible pairs of agents
-            for i in range(FLAGS.num_agents - 1):
-                for j in range(FLAGS.num_agents - 1):
+            for i in range(FLAGS.num_agents):
+                for j in range(FLAGS.num_agents):
                     flogger.Log("Agent 1: {}".format(i + 1))
                     logger.log(key="Agent 1: ", val=i + 1, step=step)
                     agent1 = models_dict["agent" + str(i + 1)]

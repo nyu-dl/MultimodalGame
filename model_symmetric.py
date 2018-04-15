@@ -977,13 +977,21 @@ def exchange(a1, a2, exchange_args):
         exchange_args: Other useful arguments.
 
     Returns:
-        s: All STOP bits. (Masks, Values, Probabilities)
-        w_1: All agent_1 messages. (Values, Probabilities)
-        w_2: All agent_2 messages. (Values, Probabilities)
-        y_1: All predictions that were made by agent 1 (Before comms, after comms)
-        y_2: All predictions that were made by agent 2 (Before comms, after comms)
-        r_1: Estimated rewards of agent_1.
-        r_2: Estimated rewards of agent_2.
+        s: Contains all stop bits [a1, a2]
+            a1 = agent1 (Masks, Values, Probabilties)
+            a2 = agent2 (Masks, Values, Probabilties)
+        message_1: All agent_1 messages. (Values, Probabilities)
+        message_2: All agent_2 messages. (Values, Probabilities)
+        y_all = [y_nc, y]
+            y_nc: (y_1_nc, y_2_nc)
+                y_1_nc: Agent 1 predictions before communication
+                y_2_nc: Agent 2 predictions before communication
+            y = (y_1, y_2)
+                y_1: All predictions that were made by agent 1 after communication
+                y_2: All predictions that were made by agent 2 after communication
+        r = (r_1, r_2)
+            r_1: Estimated rewards of agent_1.
+            r_2: Estimated rewards of agent_2.
     """
 
     # Randomly select which agent goes first

@@ -52,23 +52,6 @@ def Variable(*args, **kwargs):
     return var
 
 
-# def flipout(binary, p):
-#     """
-#     Args:
-#         binary: Tensor of binary values.
-#         p: Probability of flipping a binary value.
-#     Output:
-#         outp: Tensor with same size as `binary` where bits have been
-#             flipped with probability `p`.
-#     """
-#     mask = torch.FloatTensor(binary.size()).fill_(p).numpy()
-#     mask = Variable(torch.from_numpy(
-#         (np.random.rand(*mask.shape) < mask).astype('float32')))
-#     outp = (binary - mask).abs()
-#
-#     return outp
-
-
 def loglikelihood(log_prob, target):
     """
     Args: log softmax scores (N, C) where N is the batch size
@@ -175,9 +158,6 @@ def log_message_stats(message_stats, logger, flogger, data_type, epoch, step, i_
                 dists.append((i, j, d))
             if i == len(means) - 2:
                 break
-        # debuglogger.debug(f'Means: {means}')
-        # debuglogger.debug(f'Std: {stds}')
-        # debuglogger.debug(f'Distances: {dists}')
         logger.log(key=data_type + ": " + s + " message stats: count: ", val=num, step=step)
         for i in range(len(means)):
             logger.log(key=data_type + ": " + s + " message stats: Agent " + str(i) + ": mean: ",
@@ -335,7 +315,6 @@ def run_analyze_messages(data, data_type, logger, flogger, epoch, step, i_batch)
                 debuglogger.debug(f's_store: {s_store}')
                 debuglogger.debug(f'c_store: {c_store}')
                 debuglogger.debug(f's_c_store: {s_c_store}')
-                # sys.exit()
             j += 1
         # Calculate and log mean and std_dev
         s_store = calc_message_mean_and_std(s_store)
@@ -555,8 +534,6 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
             outp_2 = y[1][-1]
         else:
             # TODO
-            # outp_1, ent_y1 = get_outp(y[0], y1_masks)
-            # outp_2, ent_y2 = get_outp(y[1], y2_masks)
             pass
 
         # Obtain predictions, loss and stats agent 1
@@ -751,7 +728,6 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 y_nc=y_nc,
                 y=y)
             callback(agent1, agent2, batch, callback_dict)
-        # break
 
     if store_examples:
         debuglogger.info(f'Finishing iterating through dev set, storing examples...')
@@ -760,7 +736,6 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
     if analyze_messages:
         debuglogger.info(f'Analyzing messages...')
         run_analyze_messages(correct_to_analyze, "correct", logger, flogger, epoch, step, i_batch)
-        # run_analyze_messages(incorrect_to_analyze, "incorrect", logger, flogger, epoch, step, i_batch)
     if save_messages:
         debuglogger.info(f'Saving messages...')
         save_messages_and_stats(correct_to_analyze, incorrect_to_analyze, agent_tag)
@@ -1261,14 +1236,12 @@ def get_outp(y, masks):
 
 def calculate_loss_binary(binary_features, binary_probs, rewards, baseline_rewards, entropy_penalty):
     '''Calculates the reinforcement learning loss on the agent communication vectors'''
-    # debuglogger.info(f'Inside calc loss binary: Binary features: {binary_features}, binary probs: {binary_probs}')
     log_p_z = Variable(binary_features.data) * torch.log(binary_probs + 1e-8) + \
         (1 - Variable(binary_features.data)) * \
         torch.log(1 - binary_probs + 1e-8)
     log_p_z = log_p_z.sum(1)
     weight = Variable(rewards) - \
         Variable(baseline_rewards.clone().detach().data)
-    # debuglogger.debug(f'Reinforcement weight: {weight.data}')
     if rewards.size(0) > 1:  # Ensures weights are not larger than 1
         weight = weight / np.maximum(1., torch.std(weight.data))
     loss = torch.mean(-1 * weight * log_p_z)
@@ -1289,9 +1262,6 @@ def multistep_loss_binary(binary_features, binary_probs, rewards, baseline_rewar
         # TODO - implement for new agents
         pass
     else:
-        # debuglogger.debug(f'Binary features: {binary_features}')
-        # debuglogger.debug(f'Binary probs: {binary_probs}')
-        # debuglogger.debug(f'Baseline rewards: {baseline_rewards}')
         outp = list(map(lambda feat, prob, scores: calculate_loss_binary(feat, prob, rewards, scores, entropy_penalty), binary_features, binary_probs, baseline_rewards))
         losses = [o[0] for o in outp]
         entropies = [o[1] for o in outp]
@@ -1314,16 +1284,6 @@ def multistep_loss_bas(baseline_scores, rewards, masks):
     return loss
 
 
-# def bin_to_alpha(binary):
-#     ret = []
-#     interval = 5
-#     offset = 65
-#     for i in range(0, len(binary), interval):
-#         val = int(binary[i:i + interval], 2)
-#         ret.append(unichr(offset + val))
-#     return " ".join(ret)
-
-
 def calculate_accuracy(prediction_dist, target, batch_size, top_k):
     '''Calculates the prediction accuracy using correct@top_k
        Returns:
@@ -1343,62 +1303,6 @@ def calculate_accuracy(prediction_dist, target, batch_size, top_k):
     top_1 = (top_1_ind == target.view(-1, 1).cpu()).sum(dim=1)
     accuracy = correct.sum() / float(batch_size)
     return accuracy, correct, top_1
-
-
-# def log_exchange(s, message_1, message_2, log_type="Train:"):
-#     # TODO - check makes sense with symmetric agents
-#     log_string = log_type
-#     s_masks_1, s_feats_1, s_probs_1 = s[0]
-#     s_masks_2, s_feats_2, s_probs_2 = s[1]
-#     feats_1, probs_1 = message_1
-#     feats_2, probs_2 = message_2
-#     current_exchange = len(feats_1)
-#     for i_sample in range(FLAGS.exchange_samples):
-#         prev_1 = torch.FloatTensor(FLAGS.m_dim).fill_(0)
-#         prev_2 = torch.FloatTensor(FLAGS.m_dim).fill_(0)
-#         for i_exchange in range(current_exchange):
-#             probs_1_i = probs_1[i_exchange][i_sample].data.tolist(
-#             )
-#             spark_1 = sparks(
-#                 [1] + probs_1_i)[1:].encode('utf-8')
-#             probs_2_i = probs_2[i_exchange][i_sample].data.tolist(
-#             )
-#             spark_2 = sparks(
-#                 [1] + probs_2_i)[1:].encode('utf-8')
-#             s_probs_1_i = s_probs_1[i_exchange][i_sample].data.tolist(
-#             )
-#             s_spark_1 = sparks(
-#                 [1] + s_probs_1_i)[1:].encode('utf-8')
-#
-#             binary_1 = feats_1[i_exchange][i_sample].data.cpu(
-#             )
-#             hamming_1 = (prev_1 - binary_1).abs().sum()
-#             prev_1 = binary_1
-#             binary_2 = feats_2[i_exchange][i_sample].data.cpu(
-#             )
-#             hamming_2 = (prev_2 - binary_2).abs().sum()
-#             prev_2 = binary_2
-#
-#             msg_1 = "".join(
-#                 map(str, map(int, binary_1.tolist())))
-#             msg_2 = "".join(
-#                 map(str, map(int, binary_2.tolist())))
-#             if FLAGS.use_alpha:
-#                 msg_1 = bin_to_alpha(msg_1)
-#                 msg_2 = bin_to_alpha(msg_2)
-#             if i_exchange == 0:
-#                 log_string += "\n{:>3}".format(i_sample)
-#             else:
-#                 log_string += "\n   "
-#             log_string += "        {}".format(spark_1)
-#             log_string += "           {}    {}".format(
-#                 s_spark_1, spark_2)
-#             log_string += "\n    {:>3} S: {} {:4}".format(
-#                 i_exchange, msg_1, hamming_1)
-#             log_string += "    s={} R: {} {:4}".format(
-#                 s_masks_1[1:][i_exchange][i_sample].data[0], msg_2, hamming_2)
-#     log_string += "\n"
-#     return log_string
 
 
 def get_classification_loss_and_stats(predictions, targets):
@@ -1668,16 +1572,6 @@ def run():
                 dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
                     agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_self_com_A_{i + 1}')
         sys.exit()
-    # elif FLAGS.binary_only:
-    #     if not os.path.exists(FLAGS.checkpoint):
-    #         raise Exception("Must provide valid checkpoint.")
-    #     # TODO fix for new agents
-    #     debuglogger.warning(f'Extract binary not updated for new agents yet')
-    #     sys.exit()
-    #     extract_binary(FLAGS, load_hdf5, exchange, FLAGS.dev_file, FLAGS.batch_size_dev, epoch,
-    #                    FLAGS.shuffle_dev, FLAGS.cuda, FLAGS.top_k_dev,
-    #                    sender, receiver, desc_dev_dict, map_labels_dev, FLAGS.experiment_name)
-    #     sys.exit()
 
     # Training loop
     while epoch < FLAGS.max_epoch:
@@ -1810,8 +1704,6 @@ def run():
                 outp_2 = y[1][-1]
             else:
                 # TODO
-                # outp_1, ent_y1 = get_outp(y[0], y1_masks)
-                # outp_2, ent_y2 = get_outp(y[1], y2_masks)
                 pass
 
             # Before communication predictions
@@ -1900,10 +1792,6 @@ def run():
             loss_agent1 = nll_loss_1
             loss_agent2 = nll_loss_2
 
-            # debuglogger.info(f'feats_1: {feats_1}')
-            # debuglogger.info(f'feats_2: {feats_2}')
-            # debuglogger.info(f'probs_1: {probs_1}')
-            # debuglogger.info(f'probs_2: {probs_2}')
             # If training communication channel
             if FLAGS.use_binary:
                 if not FLAGS.fixed_exchange:
@@ -2048,22 +1936,6 @@ def run():
                     log_ent_agent2_y += "\n"
                     flogger.Log(log_ent_agent2_y)
 
-                # # Optionally print sampled and inferred binary vectors from
-                # # most recent exchange.
-                # if FLAGS.exchange_samples > 0:
-                #
-                #     log_train = log_exchange(
-                #         s, message_1, message_2, current_exchange, log_type="Train:")
-                #     flogger.Log(log_train)
-                #
-                #     exchange_args["train"] = False
-                #     s, message_1, message_2, y_all, r = exchange(
-                #         agent1, agent2, exchange_args)
-                #
-                #     log_train = log_exchange(
-                #         s, message_1, message_2, current_exchange, log_type="Eval:")
-                #     flogger.Log(log_train)
-
                 # Agent 1
                 logger.log(key="Loss Agent 1 (Total)",
                            val=loss_agent1.data[0], step=step)
@@ -2160,8 +2032,6 @@ def run():
                 for _, p in enumerate(num_agents_per_community):
                     idx = offset + p - 1  # Select last agent from each community to play with itself
                     key = "agent" + str(idx + 1)
-                    # dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
-                    #     models_dict[key], frozen_agents[key], FLAGS.dataset_path, True, dev_accuracy_id, logger, flogger, f'Train Set, Pool {_ + 1}, agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
                     dev_accuracy_id, total_accuracy_com = get_and_log_dev_performance(
                         models_dict[key], frozen_agents[key], FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id, logger, flogger, f'In Domain, Pool {_ + 1}, agent {idx + 1} playing with frozen version of itself, ids: {id(models_dict[key])}/{id(frozen_agents[key])}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
                     offset += p
@@ -2171,8 +2041,6 @@ def run():
                 for i in range(FLAGS.num_agents):
                     agent = models_dict["agent" + str(i + 1)]
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
-                    # dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
-                    #     agent, agent, FLAGS.dataset_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: Train Set", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
                     dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
                         agent, agent, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
 
@@ -2186,11 +2054,9 @@ def run():
 
             # Increment batch step
             step += 1
-            # break
 
         # Increment epoch
         epoch += 1
-        # break
 
     flogger.Log("Finished training.")
 
@@ -2274,7 +2140,6 @@ def flags():
     # Display settings
     gflags.DEFINE_string("env", "main", "")
     gflags.DEFINE_boolean("visdom", False, "")
-    # gflags.DEFINE_boolean("use_alpha", False, "")
     gflags.DEFINE_string("experiment_name", None, "")
     gflags.DEFINE_integer("log_interval", 50, "")
     gflags.DEFINE_integer("log_dev", 1000, "")
@@ -2354,8 +2219,6 @@ def flags():
     gflags.DEFINE_boolean("attn_extra_context", False, "")
     gflags.DEFINE_integer("attn_context_dim", 4096, "")
     gflags.DEFINE_float("dropout", 0.3, "How much dropout to apply when training using the original image")
-    # gflags.DEFINE_boolean("desc_attn", False, "agents attend over text")
-    # gflags.DEFINE_integer("desc_attn_dim", 64, "text attention dim")
     gflags.DEFINE_integer("top_k_dev", 3, "Top-k error in development")
     gflags.DEFINE_integer("top_k_train", 3, "Top-k error in training")
 
@@ -2374,7 +2237,6 @@ def flags():
     gflags.DEFINE_float("baseline_loss_weight", 1.0, "")
 
     # Conversation settings
-    # gflags.DEFINE_integer("exchange_samples", 1, "")
     gflags.DEFINE_integer("max_exchange", 1, "")
     gflags.DEFINE_boolean("fixed_exchange", True, "")
     gflags.DEFINE_boolean(

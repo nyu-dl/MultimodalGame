@@ -1445,13 +1445,13 @@ def run():
     # Only used for training agent communities
     num_agents_per_community = None
     intra_pool_connect_p = None
-    train_vec_prob = None  # Probility distribution over agent pairs, used to sample pairs per batch
-    agent_idx_list = None
+    train_vec_prob = None  # Probability distribution over agent pairs, used to sample pairs per batch
+    agent_idx_list = None  # Mapping from train_vec indices to agent pairs
     eval_agent_list = None  # List of agent pairs to evaluate each dev eval
 
     # Check agent setup
     if FLAGS.num_agents > 2 and not (FLAGS.agent_pools or FLAGS.agent_communities):
-        flogger.Log("{} is too many agents. There can only be two if FLAGS.agent_pools and FLAGS.agent_communities are false".format(FLAGS.num_agents))
+        flogger.Log("{} is too many agents. There can only be two agents if FLAGS.agent_pools and FLAGS.agent_communities are false".format(FLAGS.num_agents))
         sys.exit()
     if FLAGS.agent_pools and FLAGS.agent_communities:
         flogger.Log("You cannot train an agent pool and community at the same time. Please select one of the other")
@@ -1538,15 +1538,26 @@ def run():
     best_dev_acc = 0
 
     # Optionally load previously saved models
-    if FLAGS.agent_communities:
-        torch_load_communities(FLAGS.community_checkpoints, num_agents_per_community, models_dict, optimizers_dict)
-    elif os.path.exists(FLAGS.checkpoint):
+    if os.path.exists(FLAGS.checkpoint):
         flogger.Log("Loading from: " + FLAGS.checkpoint)
         data = torch_load(FLAGS.checkpoint, models_dict, optimizers_dict)
         flogger.Log("Loaded at step: {} and best dev acc: {}".format(
             data['step'], data['best_dev_acc']))
         step = data['step']
         best_dev_acc = data['best_dev_acc']
+        if FLAGS.agent_communities:
+            # Load train and eval matrices
+            train_vec_prob = pickle.load(open(FLAGS.checkpoint + '_train_vec.pkl', 'rb'))
+            agent_idx_list = pickle.load(open(FLAGS.checkpoint + '_agent_idx_list.pkl', 'rb'))
+            eval_agent_list = pickle.load(open(FLAGS.checkpoint + '_eval_agent_list.pkl', 'rb'))
+    elif FLAGS.agent_communities:
+        torch_load_communities(FLAGS.community_checkpoints, num_agents_per_community, models_dict, optimizers_dict)
+
+    if FLAGS.agent_communities:
+        # Save additional community data
+        pickle.dump(train_vec_prob, open(FLAGS.checkpoint + '_train_vec.pkl', 'wb'))
+        pickle.dump(agent_idx_list, open(FLAGS.checkpoint + '_agent_idx_list.pkl', 'wb'))
+        pickle.dump(eval_agent_list, open(FLAGS.checkpoint + '_eval_agent_list.pkl', 'wb'))
 
     # Copy agents to measure how much the language has changed
     frozen_agents = copy.deepcopy(models_dict)
@@ -1803,18 +1814,18 @@ def run():
                 # outp_2, ent_y2 = get_outp(y[1], y2_masks)
                 pass
 
-            # Obtain predictions, loss and stats agent 1
             # Before communication predictions
+            # Obtain predictions, loss and stats agent 1
             (dist_1_nc, maxdist_1_nc, argmax_1_nc, ent_1_nc, nll_loss_1_nc,
              logs_1_nc) = get_classification_loss_and_stats(y_nc[0], target)
-            # After communication predictions
+            # Obtain predictions, loss and stats agent 2
             (dist_2_nc, maxdist_2_nc, argmax_2_nc, ent_2_nc, nll_loss_2_nc,
              logs_2_nc) = get_classification_loss_and_stats(y_nc[1], target)
+            # After communication predictions
             # Obtain predictions, loss and stats agent 1
-            # Before communication predictions
             (dist_1, maxdist_1, argmax_1, ent_1, nll_loss_1_com,
              logs_1) = get_classification_loss_and_stats(outp_1, target)
-            # After communication predictions
+            # Obtain predictions, loss and stats agent 2
             (dist_2, maxdist_2, argmax_2, ent_2, nll_loss_2_com,
              logs_2) = get_classification_loss_and_stats(outp_2, target)
 

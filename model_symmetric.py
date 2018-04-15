@@ -2156,7 +2156,7 @@ def run():
                     offset += p
 
             # Report in domain development accuracy when agents communicate with themselves
-            if FLAGS.agent_pools and step % FLAGS.log_self_com == 0:
+            if (not FLAGS.agent_communities) and step % FLAGS.log_self_com == 0:
                 for i in range(FLAGS.num_agents):
                     agent = models_dict["agent" + str(i + 1)]
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))

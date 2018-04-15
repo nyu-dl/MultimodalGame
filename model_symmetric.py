@@ -34,8 +34,6 @@ from misc import build_mask
 from agents import Agent
 from dataset_loader import load_shapeworld_dataset
 from community_util import sample_agents, build_train_matrix, build_eval_list
-from binary_vectors import extract_binary
-from sparks import sparks
 
 import gflags
 FLAGS = gflags.FLAGS
@@ -353,13 +351,13 @@ def add_data_point(batch, i, data_store, messages_1, messages_2, probs_1, probs_
 
 def save_messages_and_stats(correct, incorrect, agent_tag):
     '''Saves all messages and message probs between two agents, along with relevant tags such as the shape, color and caption, and whether the message was correct or incorrect
-    Data is stored as a list of dicts and pickled. Each dict corresponds to one exchange. The dicts have the following sort_keys
+    Data is stored as a list of dicts and pickled. Each dict corresponds to one exchange. The dicts have the following keys
         - msg_1: message(s) sent from agent 1
         - msg_2: message(s) sent from agent 2
         - probs_1: message 1 probs
         - probs_2: message 2 probs
         - caption: the correct caption
-        - shape: the shape in the
+        - shape: the shape in the caption
         - color: the color in the caption
         - correct: boolean, whether both agents solved the task after communication
     '''
@@ -536,18 +534,18 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
             # TODO
             pass
 
-        # Obtain predictions, loss and stats agent 1
         # Before communication predictions
+        # Obtain predictions, loss and stats agent 1
         (dist_1_nc, maxdist_1_nc, argmax_1_nc, ent_1_nc, nll_loss_1_nc,
          logs_1_nc) = get_classification_loss_and_stats(y_nc[0], target)
-        # After communication predictions
+        # Obtain predictions, loss and stats agent 2
         (dist_2_nc, maxdist_2_nc, argmax_2_nc, ent_2_nc, nll_loss_2_nc,
          logs_2_nc) = get_classification_loss_and_stats(y_nc[1], target)
+        # After communication predictions
         # Obtain predictions, loss and stats agent 1
-        # Before communication predictions
         (dist_1, maxdist_1, argmax_1, ent_1, nll_loss_1_com,
          logs_1) = get_classification_loss_and_stats(outp_1, target)
-        # After communication predictions
+        # Obtain predictions, loss and stats agent 2
         (dist_2, maxdist_2, argmax_2, ent_2, nll_loss_2_com,
          logs_2) = get_classification_loss_and_stats(outp_2, target)
 

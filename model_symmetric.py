@@ -1200,7 +1200,7 @@ def exchange(a1, a2, exchange_args):
     stop_mask_2[-1].data.fill_(0)
 
     s = [(stop_mask_1, stop_feat_1, stop_prob_1),
-         (stop_mask_1, stop_feat_1, stop_prob_1)]
+         (stop_mask_2, stop_feat_2, stop_prob_2)]
     message_1 = (feats_1, probs_1)
     message_2 = (feats_2, probs_2)
     y = (y_1, y_2)

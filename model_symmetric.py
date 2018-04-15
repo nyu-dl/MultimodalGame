@@ -1441,6 +1441,8 @@ def run():
     if FLAGS.agent_communities:
         (train_vec_prob, agent_idx_list) = build_train_matrix(num_agents_per_community, FLAGS.community_type, intra_pool_connect_p, FLAGS.inter_pool_connect_p, FLAGS.ratio_adjust, FLAGS.intra_inter_ratio)
         eval_agent_list = build_eval_list(num_agents_per_community, FLAGS.community_type, train_vec_prob)
+        flogger.Log(f'Train matrix: {torch.from_numpy(np.reshape(train_vec_prob, (FLAGS.num_agents, FLAGS.num_agents)))}')
+        flogger.Log(f'Eval agent list: {eval_agent_list}')
 
     # Training metrics
     epoch = 0
@@ -1460,6 +1462,8 @@ def run():
             train_vec_prob = pickle.load(open(FLAGS.checkpoint + '_train_vec.pkl', 'rb'))
             agent_idx_list = pickle.load(open(FLAGS.checkpoint + '_agent_idx_list.pkl', 'rb'))
             eval_agent_list = pickle.load(open(FLAGS.checkpoint + '_eval_agent_list.pkl', 'rb'))
+            flogger.Log(f'Train matrix: {torch.from_numpy(np.reshape(train_vec_prob, (FLAGS.num_agents, FLAGS.num_agents)))}')
+            flogger.Log(f'Eval agent list: {eval_agent_list}')
     elif FLAGS.agent_communities:
         torch_load_communities(FLAGS.community_checkpoints, num_agents_per_community, models_dict, optimizers_dict)
 

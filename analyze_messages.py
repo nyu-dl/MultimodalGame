@@ -73,7 +73,6 @@ def calc_ratios(m_dict):
         if m == 'total' or m == 'correct' or m == 'incorrect':
             pass
         else:
-            stats['total'] += 1
             stats['correct_p'] = stats['correct'] / stats['total']
             stats['incorrect_p'] = stats['incorrect'] / stats['total']
             shape_dict = stats['shape']
@@ -333,7 +332,7 @@ def add_shape_color_elem(d, m_dict, shape=None, color=None, blanks=[]):
 def study_shape_color(data, shape, color, blanks=[]):
     m_dict = {shape: {'1': {'all': []}, '2': {'all': []}, 'count': 0},
               color: {'1': {'all': []}, '2': {'all': []}, 'count': 0},
-              shape + '_' + color: {'1': {'all': []}, '2': {'all': []}, 'count': 0}}
+              shape + '_' + str(color): {'1': {'all': []}, '2': {'all': []}, 'count': 0}}
     skip_1 = 0
     skip_2 = 0
     for _, d in enumerate(data):
@@ -344,10 +343,18 @@ def study_shape_color(data, shape, color, blanks=[]):
                 skip_2 += 1
             m_dict = add_shape_color_elem(d, m_dict, shape=shape, color=color, blanks=blanks)
         elif d['shape'] == shape:
+            if convert_tensor_to_string(d['msg_1'][0]) in blanks:
+                skip_1 += 1
+            if convert_tensor_to_string(d['msg_2'][0]) in blanks:
+                skip_2 += 1
             m_dict = add_shape_color_elem(d, m_dict, shape=shape, color=None, blanks=blanks)
         elif d['color'] == color:
+            if convert_tensor_to_string(d['msg_1'][0]) in blanks:
+                skip_1 += 1
+            if convert_tensor_to_string(d['msg_2'][0]) in blanks:
+                skip_2 += 1
             m_dict = add_shape_color_elem(d, m_dict, shape=None, color=color, blanks=blanks)
-    # print(f'Skipped {skip_1}/{skip_2} messages for {shape}_{color}')
+    # print(f'Skipped {skip_1}/{skip_2} messages for {shape} and / or {color}')
     '''Calc mean and std of messages per shape, color and shape color'''
     m_dict[color]['1']['all'] = np.stack(m_dict[color]['1']['all'])
     m_dict[color]['2']['all'] = np.stack(m_dict[color]['2']['all'])
@@ -356,32 +363,38 @@ def study_shape_color(data, shape, color, blanks=[]):
     m_dict[shape + '_' + color]['1']['all'] = np.stack(m_dict[shape + '_' + color]['1']['all'])
     m_dict[shape + '_' + color]['2']['all'] = np.stack(m_dict[shape + '_' + color]['2']['all'])
 
-    # print(f"Number {color}: {m_dict[color]['1']['all'].shape}")
+    # print(f"Number {color}: A1: {m_dict[color]['1']['all'].shape}, A2: {m_dict[color]['2']['all'].shape}")
     m_dict[color]['1']['mean'] = np.mean(m_dict[color]['1']['all'], axis=0)
     m_dict[color]['1']['std'] = np.std(m_dict[color]['1']['all'], axis=0)
+    m_dict[color]['1']['count'] = m_dict[color]['1']['all'].shape[0]
     del m_dict[color]['1']['all']
-    # print(m_dict[color]['2']['all'].shape)
     m_dict[color]['2']['mean'] = np.mean(m_dict[color]['2']['all'], axis=0)
     m_dict[color]['2']['std'] = np.std(m_dict[color]['2']['all'], axis=0)
+    m_dict[color]['2']['count'] = m_dict[color]['2']['all'].shape[0]
     del m_dict[color]['2']['all']
+    # print(f"Number {color}: A1: {m_dict[color]['1']['count']}, A2: {m_dict[color]['2']['count']}")
 
-    # print(f"Number {shape}: {m_dict[shape]['1']['all'].shape}")
+    # print(f"Number {shape}: A1: {m_dict[shape]['1']['all'].shape}, A2: {m_dict[shape]['2']['all'].shape}")
     m_dict[shape]['1']['mean'] = np.mean(m_dict[shape]['1']['all'], axis=0)
     m_dict[shape]['1']['std'] = np.std(m_dict[shape]['1']['all'], axis=0)
+    m_dict[shape]['1']['count'] = m_dict[shape]['1']['all'].shape[0]
     del m_dict[shape]['1']['all']
-    # print(m_dict[shape]['2']['all'].shape)
     m_dict[shape]['2']['mean'] = np.mean(m_dict[shape]['2']['all'], axis=0)
     m_dict[shape]['2']['std'] = np.std(m_dict[shape]['2']['all'], axis=0)
+    m_dict[shape]['2']['count'] = m_dict[shape]['2']['all'].shape[0]
     del m_dict[shape]['2']['all']
+    # print(f"Number {shape}: A1: {m_dict[shape]['1']['count']}, A2: {m_dict[shape]['2']['count']}")
 
-    print(f"Number {shape}_{color}: {m_dict[shape + '_' + color]['1']['all'].shape}/{m_dict[shape + '_' + color]['2']['all'].shape}")
+    # print(f"Number {shape}_{color}: A1: {m_dict[shape + '_' + color]['1']['all'].shape}, A2: {m_dict[shape + '_' + color]['2']['all'].shape}")
     m_dict[shape + '_' + color]['1']['mean'] = np.mean(m_dict[shape + '_' + color]['1']['all'], axis=0)
     m_dict[shape + '_' + color]['1']['std'] = np.std(m_dict[shape + '_' + color]['1']['all'], axis=0)
+    m_dict[shape + '_' + color]['1']['count'] = m_dict[shape + '_' + color]['1']['all'].shape[0]
     del m_dict[shape + '_' + color]['1']['all']
-    # print(m_dict[shape + '_' + color]['2']['all'].shape)
     m_dict[shape + '_' + color]['2']['mean'] = np.mean(m_dict[shape + '_' + color]['2']['all'], axis=0)
     m_dict[shape + '_' + color]['2']['std'] = np.std(m_dict[shape + '_' + color]['2']['all'], axis=0)
+    m_dict[shape + '_' + color]['2']['count'] = m_dict[shape + '_' + color]['2']['all'].shape[0]
     del m_dict[shape + '_' + color]['2']['all']
+    # print(f"Number {shape}_{color}: A1: {m_dict[shape + '_' + color]['1']['count']}, A2: {m_dict[shape + '_' + color]['2']['count']}")
     return m_dict
 
 
@@ -420,12 +433,14 @@ def create_shape_color_combos(data, blanks=[]):
             print(f'Mean messages for {s}: colors: {cols}')
             mean_1 = torch.from_numpy(np.stack(mean_1))
             mean_2 = torch.from_numpy(np.stack(mean_2))
-            c_1 = torch.mean(mean_1, dim=0)
-            c_2 = torch.mean(mean_2, dim=0)
             print(f'Agent 1: {mean_1}')
             print(f'Agent 2: {mean_2}')
-            codes_s1.append((s, c_1))
-            codes_s2.append((s, c_2))
+        result = study_shape_color(data, s, 'gray', blanks=blanks)
+        print(f'Num messages for {s}, A1: {result[s]["1"]["count"]}, A2: {result[s]["2"]["count"]}')
+        c_1 = result[s]['1']['mean']
+        c_2 = result[s]['2']['mean']
+        codes_s1.append((s, c_1))
+        codes_s2.append((s, c_2))
     print('================================== COLORS ==================================')
     for c in COLORS:
         mean_1 = []
@@ -444,12 +459,14 @@ def create_shape_color_combos(data, blanks=[]):
             print(f'Mean messages for {c}: shapes: {sh}')
             mean_1 = torch.from_numpy(np.stack(mean_1))
             mean_2 = torch.from_numpy(np.stack(mean_2))
-            c_1 = torch.mean(mean_1, dim=0)
-            c_2 = torch.mean(mean_2, dim=0)
             print(f'Agent 1: {mean_1}')
             print(f'Agent 2: {mean_2}')
-            codes_c1.append((c, c_1))
-            codes_c2.append((c, c_2))
+        result = study_shape_color(data, 'semicircle', c, blanks=blanks)
+        print(f'Num messages for {c}, A1: {result[c]["1"]["count"]}, A2: {result[c]["2"]["count"]}')
+        c_1 = result[c]['1']['mean']
+        c_2 = result[c]['2']['mean']
+        codes_c1.append((c, c_1))
+        codes_c2.append((c, c_2))
     shapes = [x[0] for x in codes_s1]
     print(f'Shapes: {shapes}')
     shape_codes_1 = [x[1] for x in codes_s1]
@@ -476,6 +493,7 @@ def create_shape_color_combos(data, blanks=[]):
     print(f'Quantized color codes, agent 1: {color_codes_mean_1}')
     color_codes_mean_2 = quantize_codes(color_codes_mean_2)
     print(f'Quantized color codes, agent 2: {color_codes_mean_2}')
+    return codes_c1, codes_c2, codes_s1, codes_s2
 
 
 def print_shape_color_results(result, shape, color, sc):
@@ -487,7 +505,16 @@ def print_shape_color_results(result, shape, color, sc):
     print(f"{sc}: {2}:\nmean: {result[sc]['2']['mean']}\nstd: {result[sc]['2']['std']}")
 
 
-def analyze_messages(data):
+def convert_codes_to_dict(c1, c2):
+    d = {}
+    for elem in c1:
+        d[elem[0]] = torch.from_numpy(elem[1])
+    for elem in c2:
+        d[elem[0]] = torch.from_numpy(elem[1])
+    return d
+
+
+def analyze_messages(data, path):
     print(f'========================== Analyzing messages from {args.path} ==========================')
     m_dict, list_dict = build_message_dict(data, agents="one")
     m_dict_2, list_dict_2 = build_message_dict(data, agents="two")
@@ -557,9 +584,18 @@ def analyze_messages(data):
     sc = shape + '_' + color
     result = study_shape_color(data, shape, color)
     pprint.pprint(result)
-    create_shape_color_combos(data)
+    _, _, _, _ = create_shape_color_combos(data)
     print('================================== Shape color studies, no blank msg ==================================')
-    create_shape_color_combos(data, blanks=[list_dict[0][0], list_dict_2[0][0]])
+    codes_c1, codes_c2, codes_s1, codes_s2 = create_shape_color_combos(data, blanks=[list_dict[0][0], list_dict_2[0][0]])
+    dict_c1 = convert_codes_to_dict(codes_c1, codes_s1)
+    dict_c2 = convert_codes_to_dict(codes_c2, codes_s2)
+    print("Agent 1 dictionary")
+    pprint.pprint(dict_c1)
+    print("Agent 2 dictionary")
+    pprint.pprint(dict_c2)
+    print("Saving average shape and color code dictionaries to file...")
+    pickle.dump(dict_c1, open(path + '_mean_codes_A1.pkl', 'wb'))
+    pickle.dump(dict_c2, open(path + '_mean_codes_A2.pkl', 'wb'))
 
 
 def check_distribution(data):
@@ -589,4 +625,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     data = pickle.load(open(args.path, 'rb'))
     check_distribution(data)
-    analyze_messages(data)
+    analyze_messages(data, args.path[:-4])

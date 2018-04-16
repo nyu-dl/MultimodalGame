@@ -339,8 +339,8 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
 
         # Identify non blank partition
         non_blank_partition = []
-        for i in range(batch_size):
-            idx = get_non_blank_partition(batch['masked_im_1'][i], batch['masked_im_2'][i])
+        for j in range(batch_size):
+            idx = get_non_blank_partition(batch['masked_im_1'][j], batch['masked_im_2'][j])
             non_blank_partition.append(idx)
         batch['non_blank_partition'] = non_blank_partition
 

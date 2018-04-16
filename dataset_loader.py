@@ -154,6 +154,26 @@ def convert_texts(texts, word_dict=None):
     return texts_ints, word2id, id2word
 
 
+def get_non_blank_partition(masked_im_1, masked_im_2):
+    '''Takes a pair of image partitions and returns the index partition that is not blank.
+        1 = partition 1 is non blank
+        2 = partition 1 is non blank
+        0 = both partitions are non blank'''
+    flat_1 = masked_im_1.numpy().reshape((3 * 227 * 227))
+    result_1 = flat_1[np.where(flat_1 > 0.0, np.where(flat_1 < 1.0, True, False), False)]
+    flat_2 = masked_im_2.numpy().reshape((3 * 227 * 227))
+    result_2 = flat_2[np.where(flat_2 > 0.0, np.where(flat_2 < 1.0, True, False), False)]
+    if result_1.size != 0 and result_2.size != 0:
+        return 0
+    elif result_1.size != 0:
+        return 1
+    elif result_2.size != 0:
+        return 2
+    else:
+        print('ERROR: BOTH IMAGES BLANK')
+        sys.exit()
+
+
 def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, batch_size, random_seed, shuffle, img_feats, cuda, truncate_final_batch=False):
     """
     Reads ShapeWorld dataset into random num_batches
@@ -316,6 +336,14 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         else:
             batch["im_feats_1"] = (model(m_im_1, request=img_feats)[0]).detach()
             batch["im_feats_2"] = (model(m_im_2, request=img_feats)[0]).detach()
+
+        # Identify non blank partition
+        non_blank_partition = []
+        for i in range(batch_size):
+            idx = get_non_blank_partition(batch['masked_im_1'][i], batch['masked_im_2'][i])
+            non_blank_partition.append(idx)
+        batch['non_blank_partition'] = non_blank_partition
+
         yield batch
 
 
@@ -333,12 +361,17 @@ if __name__ == "__main__":
     size = 100
     ds_type = 'agreement'
     name = 'oneshape_simple_textselect'
-    batch_size = 16
+    batch_size = 20
     random_seed = 12
     img_feats = 'avgpool_512'
     shuffle = True
     cuda = False
     dataloader = load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, batch_size, random_seed, shuffle, img_feats, cuda, truncate_final_batch=False)
     for i_batch, batch in enumerate(dataloader):
-        # pprint.pprint(batch)
-        break
+        # Test identify partition
+        save_image(batch['images'], data_path + '/example_ims_orig_' + str(i_batch) + '.png', pad_value=0.5)
+        save_image(batch['masked_im_1'], data_path + '/example_ims_1_' + str(i_batch) + '.png', pad_value=0.5)
+        save_image(batch['masked_im_2'], data_path + '/example_ims_2_' + str(i_batch) + '.png', pad_value=0.5)
+        print(f'Batch: {i_batch}, non blank partition: {batch["non_blank_partition"]}')
+        if i_batch == 5:
+            break

@@ -291,9 +291,30 @@ def load_shapeworld_dataset(data_path, embed_path, mode, size, ds_type, name, ba
         assert len(batch["shapes"]) == batch_size
         assert len(batch["colors"]) == batch_size
 
+        # Get shape and color for texts
+        batch["texts_shapes"] = []
+        batch["texts_colors"] = []
+        for t in batch["texts_str"]:
+            s = []
+            c = []
+            for cap in t:
+                cap = cap.split()
+                color = None
+                shape = None
+                for w in cap:
+                    if w in SHAPES:
+                        shape = w
+                    if w in COLORS:
+                        color = w
+                s.append(shape)
+                c.append(color)
+            batch["texts_shapes"].append(s)
+            batch["texts_colors"].append(c)
+        assert len(batch["texts_shapes"]) == batch_size
+        assert len(batch["texts_colors"]) == batch_size
+
         # Generate p
         batch['p'] = torch.from_numpy(np.random.rand(batch_size))
-        # debuglogger.debug(f'p: {batch["p"]}')
 
         # Mask images
         debuglogger.debug(f'Image dims: {batch["images"].shape}')
@@ -373,5 +394,8 @@ if __name__ == "__main__":
         save_image(batch['masked_im_1'], data_path + '/example_ims_1_' + str(i_batch) + '.png', pad_value=0.5)
         save_image(batch['masked_im_2'], data_path + '/example_ims_2_' + str(i_batch) + '.png', pad_value=0.5)
         print(f'Batch: {i_batch}, non blank partition: {batch["non_blank_partition"]}')
+        for i in range(batch_size):
+            print(f'Batch: {i_batch}, i: {i}, Caption: {batch["caption_str"][i]}, shape: {batch["shapes"][i]}, colors: {batch["colors"][i]}')
+            print(f'Batch: {i_batch}, i: {i}, Texts: {batch["texts_str"][i]}, shape: {batch["texts_shapes"][i]}, colors: {batch["texts_colors"][i]}')
         if i_batch == 5:
             break

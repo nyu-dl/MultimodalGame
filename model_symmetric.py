@@ -393,7 +393,7 @@ def save_messages_and_stats(correct, incorrect, agent_tag):
     debuglogger.info(f'Messages saved')
 
 
-def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=True, callback=None, store_examples=False, analyze_messages=True, save_messages=False, agent_tag="_"):
+def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=True, callback=None, store_examples=False, analyze_messages=True, save_messages=False, agent_tag="_", agent_dicts=None):
     """
     Function computing development accuracy and other metrics
     """
@@ -471,6 +471,11 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
     total_correct_com = 0
     atleast1_correct_nc = 0
     atleast1_correct_com = 0
+
+    # Keep track of score when messages are changed
+    test_compositionality = {}
+    if agent_dicts is not None:
+        test_compositionality = {"total": 0, "correct": [], "incorrect": [], "agent_w_changed_msg": [], "shape": [], "color": [], "orig_shape": [], "orig_color": [], "originally_correct": []}
 
     # Load development images
     if in_domain_eval:
@@ -569,8 +574,10 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
         batch_correct_top_1_nc = top_1_1_nc.float() + top_1_2_nc.float()
         batch_correct_top_1_com = top_1_1.float() + top_1_2.float()
 
-        debuglogger.debug(f'eval batch correct com: {batch_correct_com}')
-        debuglogger.debug(f'eval batch correct nc: {batch_correct_nc}')
+        debuglogger.info(f'A1 correct com: {correct_1}')
+        debuglogger.info(f'A2 correct nc: {correct_2}')
+        debuglogger.info(f'eval batch correct com: {batch_correct_com}')
+        debuglogger.info(f'eval batch correct nc: {batch_correct_nc}')
         debuglogger.debug(
             f'eval batch top 1 correct com: {batch_correct_top_1_com}')
         debuglogger.debug(
@@ -727,6 +734,93 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 y=y)
             callback(agent1, agent2, batch, callback_dict)
 
+        if agent_dicts is not None:
+            # Test compositionality
+            for _ in range _batch_size:
+                # Construct batch of size 1
+                data = {"im_feats_1": im_feats_1[_],
+                        "im_feats_2": im_feats_2[_],
+                        "p": p[_]}
+                exchange_args = dict()
+                exchange_args["data"] = data
+                exchange_args["desc"] = desc[_]
+                exchange_args["train"] = False
+                exchange_args["break_early"] = not FLAGS.fixed_exchange
+                exchange_args["test_compositionality"] = True
+                # Construct candidate example to change message to
+                # Only select examples where one agent is blind
+                if batch['non_blank_partition'][_] != 0:
+                    change_agent = batch['non_blank_partition'][_]
+                    texts = batch["texts_str"][_]
+                    s = batch["shapes"][_]
+                    c = batch["colors"][_]
+                    debuglogger.info(f'i: {_}, caption: {batch["caption_str"]}, texts: {texts}, original target: {target[_]}, Correct? {correct_1[_]}/{correct_2[_]}')
+                    for _t, t in enumerate(texts):
+                        if _t != target[_]:
+                            st = batch["texts_shapes"][_]
+                            ct = batch["texts_shapes"][_]
+                            if (st == s and ct != c) or (st != s and ct == c):
+                                exchange_args["target"] = _t
+                                exchange_args["change_agent"] = change_agent
+                                exchange_args["agent_dict"] = agent_dicts[change_agent - 1]
+                                if ct != c:
+                                    exchange_args["subtract"] = c
+                                    exchange_args["add"] = ct
+                                else:
+                                    exchange_args["subtract"] = s
+                                    exchange_args["add"] = st
+                                debuglogger.info(f'i: {_}, subtracting: {exchange_args["subtract"]}, adding: {exchange_args["add"]}')
+                                # Play game, corrupting message
+                                s, message_1, message_2, y_all, r = exchange(
+                                    agent1, agent2, exchange_args)
+
+                                s_masks_1, s_feats_1, s_probs_1 = s[0]
+                                s_masks_2, s_feats_2, s_probs_2 = s[1]
+                                feats_1, probs_1 = message_1
+                                feats_2, probs_2 = message_2
+                                y_nc = y_all[0]
+                                y = y_all[1]
+
+                                # Only care about after communication predictions
+                                score = None
+                                if change_agent == 1:
+                                    # Calculate score for agent 2
+                                    (dist_2_change, _, _, _, _, _) = get_classification_loss_and_stats(y[1][-1], _t)
+                                    _, _, top_1_2_change = calculate_accuracy(
+                                        dist_2_change, _t, 1, FLAGS.top_k_dev)
+                                    score = top_1_2_change
+                                else:
+                                    # Calculate score for agent 1
+                                    (dist_1_change, _, _, _, _, _) = get_classification_loss_and_stats(y[0][-1], _t)
+                                    _, _, top_1_1_change = calculate_accuracy(
+                                        dist_1_change, _t, 1, FLAGS.top_k_dev)
+                                    score = top_1_1_change
+                                debuglogger.info(f'i: New caption: {t}, new target: {_t}, change_agent: {change_agent}, correct: {score}')
+
+                                # Store results
+                                test_compositionality["total"] += 1
+                                test_compositionality["orig_shape"].append(s)
+                                test_compositionality["orig_color"].append(c)
+                                if score.float() == 1:
+                                    test_compositionality["correct"].append(1)
+                                else:
+                                    test_compositionality["incorrect"].append(0)
+                                if change_agent == 2:
+                                    # The other agent had their message changed
+                                    test_compositionality["originally_correct"].append(correct_1[_])
+                                    test_compositionality["agent_w_changed_msg"].append(1)
+                                else:
+                                    test_compositionality["originally_correct"].append(correct_2[_])
+                                    test_compositionality["agent_w_changed_msg"].append(2)
+                                if ct != c:
+                                    test_compositionality["shape"].append(None)
+                                    test_compositionality["color"].append(ct)
+                                else:
+                                    test_compositionality["shape"].append(st)
+                                    test_compositionality["color"].append(None)
+    if agents_dict is not None:
+        debug.logger.info(f'Total msg changed: {test_compositionality["total"]}, Correct: {sum(test_compositionality["correct"])}')
+
     if store_examples:
         debuglogger.info(f'Finishing iterating through dev set, storing examples...')
         store_exemplar_batch(correct_to_analyze, "correct", logger, flogger)
@@ -780,10 +874,10 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
     return total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra
 
 
-def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag):
+def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag, agent_dicts=None):
     '''Logs performance on the dev set'''
     total_accuracy_nc, total_accuracy_com, atleast1_accuracy_nc, atleast1_accuracy_com, extra = eval_dev(
-        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=in_domain_eval, callback=None, store_examples=store_examples, analyze_messages=analyze_messages, save_messages=save_messages, agent_tag=agent_tag)
+        dataset_path, FLAGS.top_k_dev, agent1, agent2, logger, flogger, epoch, step, i_batch, in_domain_eval=in_domain_eval, callback=None, store_examples=store_examples, analyze_messages=analyze_messages, save_messages=save_messages, agent_tag=agent_tag, agent_dicts=agent_dicts)
     dev_accuracy_log['total_acc_both_nc'].append(total_accuracy_nc)
     dev_accuracy_log['total_acc_both_com'].append(total_accuracy_com)
     dev_accuracy_log['total_acc_atl1_nc'].append(atleast1_accuracy_nc)
@@ -1022,7 +1116,7 @@ def exchange(a1, a2, exchange_args):
     break_early = exchange_args.get("break_early", False)
     corrupt = exchange_args.get("corrupt", False)
     corrupt_region = exchange_args.get("corrupt_region", None)
-
+    test_compositionality = exchange_args.get("test_compositionality", False)
     batch_size = data["im_feats_1"].size(0)
 
     # Pad with one column of ones.
@@ -1113,6 +1207,17 @@ def exchange(a1, a2, exchange_args):
         if corrupt:
             m_1e_binary = corrupt_message(corrupt_region, agent1, m_1e_binary)
 
+        # Optionally change agent 1's message
+        if test_compositionality:
+            if (who_goes_first == 1 and exchange_args["change_agent"] == 1) or (who_goes_first == 2 and exchange_args["change_agent"] == 2):
+                debuglogger.info(f'Inside exchange: Changing agent 1 message...')
+                a_dict = exchange_args["agent_dict"]
+                new_m_prob = m_1e_probs - a_dict[exchange_args["subtract"]] + a_dict[exchange_args["add"]]
+                new_m_binary = torch.clamp(new_m_prob, 0, 1).round()
+                m_1e_binary = new_m_binary
+                debuglogger.info(f'Old msg: {m_binary_1}, old prob: {m_probs_1}')
+                debuglogger.info(f'New msg: {new_m_binary}, new prob: {new_m_prob}')
+
         # Run data through agent 2
         if data_context is not None:
             # TODO
@@ -1136,6 +1241,17 @@ def exchange(a1, a2, exchange_args):
         if corrupt:
             debuglogger.info(f'Corrupting message...')
             m_2e_binary = corrupt_message(corrupt_region, agent2, m_2e_binary)
+
+        # Optionally change agent 2's message
+        if test_compositionality:
+            if (who_goes_first == 1 and exchange_args["change_agent"] == 2) or (who_goes_first == 2 and exchange_args["change_agent"] == 1):
+                debuglogger.info(f'Inside exchange: Changing agent 2 message...')
+                a_dict = exchange_args["agent_dict"]
+                new_m_prob = m_2e_probs - a_dict[exchange_args["subtract"]] + a_dict[exchange_args["add"]]
+                new_m_binary = torch.clamp(new_m_prob, 0, 1).round()
+                m_2e_binary = new_m_binary
+                debuglogger.info(f'Old msg: {m_binary_1}, old prob: {m_probs_1}')
+                debuglogger.info(f'New msg: {new_m_binary}, new prob: {new_m_prob}')
 
         # Run data through agent 1
         if data_context is not None:
@@ -1388,6 +1504,13 @@ def run():
             flogger.Log("Total number of agents does not match sum of agents in each community")
             sys.exit()
         flogger.Log(f'Total number of agents: {FLAGS.num_agents}, Agents per community: {num_agents_per_community}')
+    if FLAGS.test_compositionality and not FLAGS.eval_only:
+        flogger.Log("Can only test compositionality in eval only mode")
+        sys.exit()
+    if FLAGS.test_compositionality:
+        if len(FLAGS.agent_dicts) != FLAGS.num_agents:
+            flogger.Log("There must be a code dictionary per agent")
+            sys.exit()
 
     # Create agents
     for _ in range(FLAGS.num_agents):
@@ -1552,6 +1675,15 @@ def run():
                     else:
                         # Report in domain development accuracy
                         dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
+        elif FLAGS.test_compositionality:
+            # Load agent dictionaries
+            code_dicts = []
+            for i in range(FLAGS.num_agents):
+                _ = pickle.load(open(FLAGS.agent_dicts[0], 'rb'))
+                code_dicts.add[_]
+            for i in range(FLAGS.num_agents - 1):
+                for j in range(FLAGS.num_agents - 1):
+                    dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}', agent_dicts=(code_dicts[i], code_dicts[j]))
         elif FLAGS.agent_communities:
             eval_community(eval_agent_list, models_dict, dev_accuracy_id[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
         else:
@@ -2203,6 +2335,9 @@ def flags():
     gflags.DEFINE_integer("s_dim", 1, "Stop probability output dim")
     gflags.DEFINE_boolean("use_binary", True,
                           "Encoding whether agents uses binary features")
+    gflags.DEFINE_boolean("test_compositionality", False,
+                          "Whether to test compositionality by changing trained agent messages, eval only option")
+    gflags.DEFINE_list("agent_dicts", ['None', 'None'], "list of paths to average message code dictionaries")
     gflags.DEFINE_boolean("randomize_comms", False,
                           "Whether to randomize the order in which agents communicate")
     gflags.DEFINE_boolean("cooperative_reward", False,

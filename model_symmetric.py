@@ -1218,6 +1218,10 @@ def exchange(a1, a2, exchange_args):
                 debuglogger.info(f'Old msg: {m_binary_1}, old prob: {m_probs_1}')
                 debuglogger.info(f'New msg: {new_m_binary}, new prob: {new_m_prob}')
 
+        # Optionally mute communication channel
+        if FLAGS.no_comms_channel:
+            m_1e_binary = m_binary
+
         # Run data through agent 2
         if data_context is not None:
             # TODO
@@ -1252,6 +1256,10 @@ def exchange(a1, a2, exchange_args):
                 m_2e_binary = new_m_binary
                 debuglogger.info(f'Old msg: {m_binary_1}, old prob: {m_probs_1}')
                 debuglogger.info(f'New msg: {new_m_binary}, new prob: {new_m_prob}')
+
+        # Optionally mute communication channel
+        if FLAGS.no_comms_channel:
+            m_2e_binary = m_binary
 
         # Run data through agent 1
         if data_context is not None:
@@ -2335,6 +2343,8 @@ def flags():
     gflags.DEFINE_integer("s_dim", 1, "Stop probability output dim")
     gflags.DEFINE_boolean("use_binary", True,
                           "Encoding whether agents uses binary features")
+    gflags.DEFINE_boolean("no_comms_channel", False,
+                          "Whether to mute the communications channel")
     gflags.DEFINE_boolean("test_compositionality", False,
                           "Whether to test compositionality by changing trained agent messages, eval only option")
     gflags.DEFINE_list("agent_dicts", ['None', 'None'], "list of paths to average message code dictionaries")

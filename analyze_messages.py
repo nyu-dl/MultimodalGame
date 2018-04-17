@@ -232,6 +232,7 @@ def calc_entropy_ratio(data, agents, answer_type):
     messages = []
     message_probs = []
     convert = torch.log(torch.zeros(1).fill_(2))
+    nans = 0
     for _, d in enumerate(data):
         include = None
         if answer_type == "both":
@@ -246,24 +247,41 @@ def calc_entropy_ratio(data, agents, answer_type):
                     messages.append(msg.numpy())
                     message_probs.append(m_prob.numpy())
                     H = - torch.mul(m_prob, torch.log(m_prob) / convert).sum() - torch.mul(1 - m_prob, torch.log(1 - m_prob) / convert).sum()
-                    entropies.append(H)
+                    if np.isnan(H):
+                        # print("ARRRGHHH NAN!")
+                        nans += 1
+                    else:
+                        entropies.append(H)
                 for msg, m_prob in zip(d["msg_2"], d["probs_2"]):
                     messages.append(msg.numpy())
                     message_probs.append(m_prob.numpy())
                     H = - torch.mul(m_prob, torch.log(m_prob) / convert).sum() - torch.mul(1 - m_prob, torch.log(1 - m_prob) / convert).sum()
-                    entropies.append(H)
+                    if np.isnan(H):
+                        # print("ARRRGHHH NAN!")
+                        nans += 1
+                    else:
+                        entropies.append(H)
             elif agents == "one":
                 for msg, m_prob in zip(d["msg_1"], d["probs_1"]):
                     messages.append(msg.numpy())
                     message_probs.append(m_prob.numpy())
                     H = - torch.mul(m_prob, torch.log(m_prob) / convert).sum() - torch.mul(1 - m_prob, torch.log(1 - m_prob) / convert).sum()
-                    entropies.append(H)
+                    if np.isnan(H):
+                        # print("ARRRGHHH NAN!")
+                        nans += 1
+                    else:
+                        entropies.append(H)
             elif agents == "two":
                 for msg, m_prob in zip(d["msg_2"], d["probs_2"]):
                     messages.append(msg.numpy())
                     message_probs.append(m_prob.numpy())
                     H = - torch.mul(m_prob, torch.log(m_prob) / convert).sum() - torch.mul(1 - m_prob, torch.log(1 - m_prob) / convert).sum()
-                    entropies.append(H)
+                    if np.isnan(H):
+                        # print("ARRRGHHH NAN!")
+                        nans += 1
+                    else:
+                        entropies.append(H)
+    print(f'Number of messages skipped due to nan: {nans}')
     # print(f'Entropies: {entropies[:10]}')
     mean_e = sum(entropies) / len(entropies)
     messages = np.stack(messages)

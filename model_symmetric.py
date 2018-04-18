@@ -475,7 +475,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
     # Keep track of score when messages are changed
     test_compositionality = {}
     if agent_dicts is not None:
-        test_compositionality = {"total": 0, "correct": [], "incorrect": [], "agent_w_changed_msg": [], "shape": [], "color": [], "orig_shape": [], "orig_color": [], "originally_correct": []}
+        test_compositionality = {"total": 0, "correct": [], "agent_w_changed_msg": [], "shape": [], "color": [], "orig_shape": [], "orig_color": [], "originally_correct": []}
 
     # Load development images
     if in_domain_eval:
@@ -824,7 +824,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                                 if score[0] == 1:
                                     test_compositionality["correct"].append(1)
                                 else:
-                                    test_compositionality["incorrect"].append(0)
+                                    test_compositionality["correct"].append(0)
                                 if change_agent == 2:
                                     # The other agent had their message changed
                                     test_compositionality["originally_correct"].append(correct_1[_])
@@ -884,6 +884,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
     extra['colors_accuracy'] = colors_accuracy
     extra['agent1_performance'] = agent1_performance
     extra['agent2_performance'] = agent2_performance
+    extra['test_compositionality'] = test_compositionality
 
     debuglogger.debug(f'Eval total size: {total}')
     total_accuracy_nc = total_correct_nc / total
@@ -1018,6 +1019,55 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
                 extra['colors_accuracy'][k]['total'],
                 extra['colors_accuracy'][k]['correct'],
                 extra['colors_accuracy'][k]['correct'] / extra['colors_accuracy'][k]['total']))
+
+    if agent_dicts is not None:
+        flogger.Log('Test compositionality performance')
+        comp_dict = {}
+        comp_data = extra['test_compositionality']
+        #print(comp_data)
+        correct_orig_correct = 0
+        correct_orig_incorrect = 0
+        orig_correct = 0
+        orig_incorrect = 0
+        correct = 0
+        for i in range(len(comp_data['orig_shape'])):
+            if comp_data['shape'][i] is not None:
+                transform = comp_data['orig_shape'][i] + '_' + comp_data['shape'][i]
+            else:
+                transform = comp_data['orig_color'][i] + '_' + comp_data['color'][i]
+            if transform not in comp_dict:
+                comp_dict[transform] = {'total': 0, 'correct': 0, 'p_correct': 0,
+                                        'orig_correct': {'total': 0, 'correct': 0, 'p_correct': 0},
+                                        'orig_incorrect': {'total': 0, 'correct': 0, 'p_correct': 0}
+                                       }
+            comp_dict[transform]['total'] += 1
+            if comp_data['correct'][i] == 1:
+                comp_dict[transform]['correct'] += 1
+                correct += 1
+            #print(comp_data['originally_correct'][i])
+            if comp_data['originally_correct'][i] == 1:
+                comp_dict[transform]['orig_correct']['total'] += 1
+                orig_correct += 1
+                if comp_data['correct'][i]:
+                    comp_dict[transform]['orig_correct']['correct'] += 1
+                    correct_orig_correct += 1
+            else:
+                comp_dict[transform]['orig_incorrect']['total'] += 1
+                orig_incorrect += 1
+                if comp_data['correct'][i]:
+                    comp_dict[transform]['orig_incorrect']['correct'] += 1
+                    correct_orig_incorrect += 1
+        flogger.Log(f'Test comp: total: {len(comp_data["orig_shape"])} orig correct: {orig_correct} orig incorrect: {orig_incorrect}')
+        flogger.Log(f'Total correct: {correct}/{correct / len(comp_data["orig_shape"])}, orig_correct_correct {correct_orig_correct}/{correct_orig_correct / orig_correct}, orig_incorrect_correct {correct_orig_incorrect}/{correct_orig_incorrect / orig_incorrect}')
+        for key in comp_dict:
+            comp_dict[key]['p_correct'] = comp_dict[key]['correct'] / comp_dict[key]['total']
+            if comp_dict[key]['orig_correct']['total'] > 0:
+                comp_dict[key]['orig_correct']['p_correct'] = comp_dict[key]['orig_correct']['correct'] / comp_dict[key]['orig_correct']['total']
+            if comp_dict[key]['orig_incorrect']['total'] > 0:
+                comp_dict[key]['orig_incorrect']['p_correct'] = comp_dict[key]['orig_incorrect']['correct'] / comp_dict[key]['orig_incorrect']['total']
+            flogger.Log(f'Transform {key}: total: {comp_dict[key]["total"]}:{comp_dict[key]["correct"]}/{comp_dict[key]["p_correct"]}')
+            flogger.Log(f'Transform {key}: orig_correct: {comp_dict[key]["orig_correct"]["total"]}:{comp_dict[key]["orig_correct"]["correct"]}/{comp_dict[key]["orig_correct"]["p_correct"]}')
+            flogger.Log(f'Transform {key}: orig_incorrect: {comp_dict[key]["orig_incorrect"]["total"]}:{comp_dict[key]["orig_incorrect"]["correct"]}/{comp_dict[key]["orig_incorrect"]["p_correct"]}')
 
     return dev_accuracy_log, total_accuracy_com
 

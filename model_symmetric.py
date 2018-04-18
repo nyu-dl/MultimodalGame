@@ -574,10 +574,10 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
         batch_correct_top_1_nc = top_1_1_nc.float() + top_1_2_nc.float()
         batch_correct_top_1_com = top_1_1.float() + top_1_2.float()
 
-        debuglogger.info(f'A1 correct com: {correct_1}')
-        debuglogger.info(f'A2 correct nc: {correct_2}')
-        debuglogger.info(f'eval batch correct com: {batch_correct_com}')
-        debuglogger.info(f'eval batch correct nc: {batch_correct_nc}')
+        debuglogger.debug(f'A1 correct com: {correct_1}')
+        debuglogger.debug(f'A2 correct nc: {correct_2}')
+        debuglogger.debug(f'eval batch correct com: {batch_correct_com}')
+        debuglogger.debug(f'eval batch correct nc: {batch_correct_nc}')
         debuglogger.debug(
             f'eval batch top 1 correct com: {batch_correct_top_1_com}')
         debuglogger.debug(

@@ -1132,6 +1132,8 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
                                        im_from_scratch=FLAGS.improc_from_scratch,
                                        dropout=FLAGS.dropout)
                         agent2.load_state_dict(agent1.state_dict())
+                        if FLAGS.cuda:
+                            agent2.cuda()
                     domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
                     _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
 

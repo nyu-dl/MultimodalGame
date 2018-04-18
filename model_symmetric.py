@@ -1801,7 +1801,7 @@ def run():
                 agent2 = copy.deepcopy(agent1)
                 flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
                 dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
-                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_self_com_A_{i + 1}')
+                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_self_com_A_{i + 1}')
         sys.exit()
 
     # Training loop

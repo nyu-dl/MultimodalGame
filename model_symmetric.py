@@ -1086,6 +1086,9 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
                         (i, j) = elem
                         agent1 = models_dict["agent" + str(i + 1)]
                         agent2 = models_dict["agent" + str(j + 1)]
+                        if i == j:
+                            # Create a copy of agents playing with themselves to avoid sharing the hidden state
+                            agent2 = copy.deepcopy(agent1)
                         domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
                         _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
         else:
@@ -1096,6 +1099,9 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
                     (i, j) = elem
                     agent1 = models_dict["agent" + str(i + 1)]
                     agent2 = models_dict["agent" + str(j + 1)]
+                    if i == j:
+                        # Create a copy of agents playing with themselves to avoid sharing the hidden state
+                        agent2 = copy.deepcopy(agent1)
                     domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
                     _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
 

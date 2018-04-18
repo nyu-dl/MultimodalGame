@@ -1779,23 +1779,23 @@ def run():
         else:
             # For the pairs of agents calculate results
             # Applies to both pools of agents and an agent pair
-            # for i in range(FLAGS.num_agents - 1):
-            #     flogger.Log("Agent 1: {}".format(i + 1))
-            #     logger.log(key="Agent 1: ", val=i + 1, step=step)
-            #     agent1 = models_dict["agent" + str(i + 1)]
-            #     flogger.Log("Agent 2: {}".format(i + 2))
-            #     logger.log(key="Agent 2: ", val=i + 2, step=step)
-            #     agent2 = models_dict["agent" + str(i + 2)]
-            #     if i == 0:
-            #         # Report in domain development accuracy and analyze messages and store examples
-            #         dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
-            #     else:
-            #         # Report in domain development accuracy
-            #         dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
-            #             agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
-            #
-            #     # Report out of domain development accuracy
-            #     dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
+            for i in range(FLAGS.num_agents - 1):
+                flogger.Log("Agent 1: {}".format(i + 1))
+                logger.log(key="Agent 1: ", val=i + 1, step=step)
+                agent1 = models_dict["agent" + str(i + 1)]
+                flogger.Log("Agent 2: {}".format(i + 2))
+                logger.log(key="Agent 2: ", val=i + 2, step=step)
+                agent2 = models_dict["agent" + str(i + 2)]
+                if i == 0:
+                    # Report in domain development accuracy and analyze messages and store examples
+                    dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
+                else:
+                    # Report in domain development accuracy
+                    dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
+                        agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
+
+                # Report out of domain development accuracy
+                dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
 
             # Report in domain development accuracy when agents communicate with themselves
             for i in range(FLAGS.num_agents):

@@ -1942,7 +1942,27 @@ def run():
                 agent2 = agents[idx2]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx2 + 1)]
                 agent_idxs[1] = idx2 + 1
-            debuglogger.info(f'Agent 1: {agent_idxs[0]}, Agent 1: {agent_idxs[1]}')
+
+            # Create a copy of agents playing with themselves to avoid sharing the hidden state
+            if FLAGS.num_agents == 1 or (agent_idxs[0] == agent_idxs[1]):
+                agent2 = Agent(im_feature_type=FLAGS.img_feat,
+                               im_feat_dim=FLAGS.img_feat_dim,
+                               h_dim=FLAGS.h_dim,
+                               m_dim=FLAGS.m_dim,
+                               desc_dim=FLAGS.desc_dim,
+                               num_classes=FLAGS.num_classes,
+                               s_dim=FLAGS.s_dim,
+                               use_binary=FLAGS.use_binary,
+                               use_attn=FLAGS.visual_attn,
+                               attn_dim=FLAGS.attn_dim,
+                               use_MLP=FLAGS.use_MLP,
+                               cuda=FLAGS.cuda,
+                               im_from_scratch=FLAGS.improc_from_scratch,
+                               dropout=FLAGS.dropout)
+                agent2.load_state_dict(agent1.state_dict())
+                if FLAGS.cuda:
+                    agent2.cuda()
+            debuglogger.debug(f'Agent 1: {agent_idxs[0]}, Agent 1: {agent_idxs[1]}')
 
             # Converted to Variable in get_classification_loss_and_stats
             target = batch["target"]
@@ -2127,13 +2147,18 @@ def run():
             loss_agent2 += FLAGS.baseline_loss_weight * loss_baseline_2
 
             if FLAGS.num_agents == 1 or (agent_idxs[0] == agent_idxs[1]):
-                debuglogger.debug(f'Agent 1 and 2 are the same')
+                debuglogger.info(f'Agent 1 and 2 are the same')
                 optimizer_agent1.zero_grad()
+                agent2.zero_grad()
                 # Get gradients from both sides of the exchange
                 loss_agent1.backward(retain_graph=True)
                 nn.utils.clip_grad_norm(agent1.parameters(), max_norm=1.)
                 loss_agent2.backward()
                 nn.utils.clip_grad_norm(agent2.parameters(), max_norm=1.)
+                # Add agent2 gradients to agent1 gradients
+                for p1, p2 in zip(agent1.parameters(), agent2.parameters()):
+                    if p1.grad is not None:
+                        p1.grad += p2.grad
                 # Only need to update agent1
                 optimizer_agent1.step()
             else:

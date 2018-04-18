@@ -733,7 +733,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 y_nc=y_nc,
                 y=y)
             callback(agent1, agent2, batch, callback_dict)
-        
+
         if agent_dicts is not None:
             # Test compositionality
             for _ in range(_batch_size):
@@ -747,9 +747,6 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 exchange_args["train"] = False
                 exchange_args["break_early"] = not FLAGS.fixed_exchange
                 exchange_args["test_compositionality"] = True
-                #debuglogger.info(f'Im feats 1: {im_feats_1.shape}/{data["im_feats_1"].shape}')
-                #debuglogger.info(f'Im feats 2: {im_feats_2.shape}/{data["im_feats_2"].shape}')
-                #debuglogger.info(f'Desc: {desc.shape}/{exchange_args["desc"].shape}')
                 # Construct candidate example to change message to
                 # Only select examples where one agent is blind
                 debuglogger.info(f'Iterating through texts and changing messages...')
@@ -767,7 +764,6 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                         if _t != target[_]:
                             st = batch["texts_shapes"][_][_t]
                             ct = batch["texts_colors"][_][_t]
-                            #debuglogger.info(f'Original shape: {s}, color: {c}, Candidate shape: {st}, color: {ct}')
                             if (st == s and ct != c) or (st != s and ct == c):
                                 exchange_args["target"] = _t
                                 exchange_args["change_agent"] = change_agent
@@ -820,7 +816,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                                 test_compositionality["total"] += 1
                                 test_compositionality["orig_shape"].append(s)
                                 test_compositionality["orig_color"].append(c)
-                                
+
                                 if score[0] == 1:
                                     test_compositionality["correct"].append(1)
                                 else:
@@ -838,7 +834,7 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                                 else:
                                     test_compositionality["shape"].append(st)
                                     test_compositionality["color"].append(None)
-    
+
     if agent_dicts is not None:
         debuglogger.info(f'Total msg changed: {test_compositionality["total"]}, Correct: {sum(test_compositionality["correct"])}')
 
@@ -1024,7 +1020,6 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
         flogger.Log('Test compositionality performance')
         comp_dict = {}
         comp_data = extra['test_compositionality']
-        #print(comp_data)
         correct_orig_correct = 0
         correct_orig_incorrect = 0
         orig_correct = 0
@@ -1038,13 +1033,11 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
             if transform not in comp_dict:
                 comp_dict[transform] = {'total': 0, 'correct': 0, 'p_correct': 0,
                                         'orig_correct': {'total': 0, 'correct': 0, 'p_correct': 0},
-                                        'orig_incorrect': {'total': 0, 'correct': 0, 'p_correct': 0}
-                                       }
+                                        'orig_incorrect': {'total': 0, 'correct': 0, 'p_correct': 0}}
             comp_dict[transform]['total'] += 1
             if comp_data['correct'][i] == 1:
                 comp_dict[transform]['correct'] += 1
                 correct += 1
-            #print(comp_data['originally_correct'][i])
             if comp_data['originally_correct'][i] == 1:
                 comp_dict[transform]['orig_correct']['total'] += 1
                 orig_correct += 1
@@ -1332,7 +1325,7 @@ def exchange(a1, a2, exchange_args):
                 if FLAGS.cuda:
                     add = add.cuda()
                     sub = sub.cuda()
-                new_m_prob = m_2e_probs.data - sub + add 
+                new_m_prob = m_2e_probs.data - sub + add
                 new_m_binary = torch.clamp(new_m_prob, 0, 1).round()
                 m_2e_binary = _Variable(new_m_binary)
                 debuglogger.info(f'Old msg: {m_binary_1}, old prob: {m_probs_1}')
@@ -1778,7 +1771,7 @@ def run():
                 logger.log(key="Agent 2: ", val=i + 2, step=step)
                 agent2 = models_dict["agent" + str(i + 2)]
                 dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 2}', agent_dicts=(code_dicts[i], code_dicts[i + 1]))
-                #dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 1}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 1}', agent_dicts=(code_dicts[i], code_dicts[i]))
+                # dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 1}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 1}', agent_dicts=(code_dicts[i], code_dicts[i]))
         elif FLAGS.agent_communities:
             eval_community(eval_agent_list, models_dict, dev_accuracy_id[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
         else:

@@ -1751,6 +1751,9 @@ def run():
                     flogger.Log("Agent 2: {}".format(j + 1))
                     logger.log(key="Agent 2: ", val=j + 1, step=step)
                     agent2 = models_dict["agent" + str(j + 1)]
+                    if i == j:
+                        # Create a copy of agents playing with themselves to avoid sharing the hidden state
+                        agent2 = copy.deepcopy(agent1)
                     if i == 0 and j == 0:
                         # Report in domain development accuracy and store examples
                         dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
@@ -1771,7 +1774,6 @@ def run():
                 logger.log(key="Agent 2: ", val=i + 2, step=step)
                 agent2 = models_dict["agent" + str(i + 2)]
                 dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 2}', agent_dicts=(code_dicts[i], code_dicts[i + 1]))
-                # dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent1, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 1}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 1}', agent_dicts=(code_dicts[i], code_dicts[i]))
         elif FLAGS.agent_communities:
             eval_community(eval_agent_list, models_dict, dev_accuracy_id[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
         else:
@@ -1798,6 +1800,7 @@ def run():
             # Report in domain development accuracy when agents communicate with themselves
             for i in range(FLAGS.num_agents):
                 agent1 = models_dict["agent" + str(i + 1)]
+                # Create a copy of agents playing with themselves to avoid sharing the hidden state
                 agent2 = copy.deepcopy(agent1)
                 flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
                 dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(

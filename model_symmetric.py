@@ -1103,6 +1103,8 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
                                            im_from_scratch=FLAGS.improc_from_scratch,
                                            dropout=FLAGS.dropout)
                             agent2.load_state_dict(agent1.state_dict())
+                            if FLAGS.cuda:
+                                agent2.cuda()
                         domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
                         _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
         else:
@@ -1802,6 +1804,8 @@ def run():
                                        im_from_scratch=FLAGS.improc_from_scratch,
                                        dropout=FLAGS.dropout)
                         agent2.load_state_dict(agent1.state_dict())
+                        if FLAGS.cuda:
+                            agent2.cuda()
                     if i == 0 and j == 0:
                         # Report in domain development accuracy and store examples
                         dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')

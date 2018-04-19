@@ -1135,6 +1135,8 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
                                        im_from_scratch=FLAGS.improc_from_scratch,
                                        dropout=FLAGS.dropout)
                         agent2.load_state_dict(agent1.state_dict())
+                        if FLAGS.cuda:
+                            agent2.cuda()
                     domain = f'In Domain Dev: Agent {i + 1} | Agent {j + 1}, ids [{id(agent1)}]/[{id(agent2)}]: '
                     _, _ = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_log, logger, flogger, domain, epoch, step, i_batch, store_examples, analyze_messages, save_messages, agent_tag)
 
@@ -2306,7 +2308,7 @@ def run():
                             else:
                                 # Report in domain development accuracy
                                 dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
-                                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
+                                    _agent1, _agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
 
                 # Report out of domain development accuracy
                 dev_accuracy_ood, total_accuracy_com = get_and_log_dev_performance(
@@ -2329,7 +2331,24 @@ def run():
             if (not FLAGS.agent_communities) and step % FLAGS.log_self_com == 0:
                 for i in range(FLAGS.num_agents):
                     agent1 = models_dict["agent" + str(i + 1)]
-                    agent2 = copy.deepcopy(agent1)
+                    # Create a copy of agents playing with themselves to avoid sharing the hidden state
+                    agent2 = Agent(im_feature_type=FLAGS.img_feat,
+                                           im_feat_dim=FLAGS.img_feat_dim,
+                                           h_dim=FLAGS.h_dim,
+                                           m_dim=FLAGS.m_dim,
+                                           desc_dim=FLAGS.desc_dim,
+                                           num_classes=FLAGS.num_classes,
+                                           s_dim=FLAGS.s_dim,
+                                           use_binary=FLAGS.use_binary,
+                                           use_attn=FLAGS.visual_attn,
+                                           attn_dim=FLAGS.attn_dim,
+                                           use_MLP=FLAGS.use_MLP,
+                                           cuda=FLAGS.cuda,
+                                           im_from_scratch=FLAGS.improc_from_scratch,
+                                           dropout=FLAGS.dropout)
+                    agent2.load_state_dict(agent1.state_dict())
+                    if FLAGS.cuda:
+                        agent2.cuda()
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
                     dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
                         agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')

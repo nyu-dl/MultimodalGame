@@ -795,22 +795,25 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                                 debuglogger.info(f'Old target: {target[_]}')
                                 na, argmax_y1 = torch.max(y[0][-1], 1)
                                 na, argmax_y2 = torch.max(y[1][-1], 1)
+                                debuglogger.info(f'y1 logits: {y[0][-1].data}, y2 logits: {y[1][-1].data}')
                                 debuglogger.info(f'y1: {argmax_y1.data[0]}, y2: {argmax_y2.data[0]}, new_target: {new_target[0]}')
                                 if FLAGS.cuda:
                                     new_target = new_target.cuda()
                                 if change_agent == 1:
                                     # Calculate score for agent 2
                                     (dist_2_change, na, na, na, na, na) = get_classification_loss_and_stats(y[1][-1], new_target)
+                                    debuglogger.info(f'dist: {dist_2_change.data}')
                                     na, na, top_1_2_change = calculate_accuracy(
                                         dist_2_change, new_target, 1, FLAGS.top_k_dev)
                                     score = top_1_2_change
                                 else:
                                     # Calculate score for agent 1
                                     (dist_1_change, na, na, na, na, na) = get_classification_loss_and_stats(y[0][-1], new_target)
+                                    debuglogger.info(f'dist: {dist_1_change.data}')
                                     na, na, top_1_1_change = calculate_accuracy(
                                         dist_1_change, new_target, 1, FLAGS.top_k_dev)
                                     score = top_1_1_change
-                                debuglogger.info(f'i: New caption: {t}, new target: {_t}, change_agent: {change_agent}, correct: {score[0]}, originally correct: {correct_1[_]}/{correct_2[_]}')
+                                debuglogger.info(f'i: {_}_{_t}: New caption: {t}, new target: {_t}, change_agent: {change_agent}, correct: {score[0]}, originally correct: {correct_1[_]}/{correct_2[_]}')
 
                                 # Store results
                                 test_compositionality["total"] += 1

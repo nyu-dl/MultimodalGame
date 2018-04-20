@@ -1945,6 +1945,13 @@ def run():
                 agent2 = agents[idx2]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx2 + 1)]
                 agent_idxs[1] = idx2 + 1
+            else:
+                # Training with just a pair of agents
+                agent1 = agents[0]
+                agent2 = agents[1]
+                optimizer_agent1 = optimizers_dict["optimizer_agent1"]
+                optimizer_agent2 = optimizers_dict["optimizer_agent2"]
+                agent_idxs = [1, 2]
             debuglogger.info(f'Agent 1: {agent_idxs[0]}, Agent 1: {agent_idxs[1]}')
 
             # Converted to Variable in get_classification_loss_and_stats
@@ -2332,7 +2339,7 @@ def run():
                 for i in range(FLAGS.num_agents):
                     agent1 = models_dict["agent" + str(i + 1)]
                     # Create a copy of agents playing with themselves to avoid sharing the hidden state
-                    agent_temp = Agent(im_feature_type=FLAGS.img_feat,
+                    agent2 = Agent(im_feature_type=FLAGS.img_feat,
                                            im_feat_dim=FLAGS.img_feat_dim,
                                            h_dim=FLAGS.h_dim,
                                            m_dim=FLAGS.m_dim,
@@ -2346,12 +2353,12 @@ def run():
                                            cuda=FLAGS.cuda,
                                            im_from_scratch=FLAGS.improc_from_scratch,
                                            dropout=FLAGS.dropout)
-                    agent_temp.load_state_dict(agent1.state_dict())
+                    agent2.load_state_dict(agent1.state_dict())
                     if FLAGS.cuda:
-                        agent_temp.cuda()
+                        agent2.cuda()
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
                     dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
-                        agent1, agent_temp, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
+                        agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')
 
             # Save model periodically
             if step >= FLAGS.save_after and step % FLAGS.save_interval == 0:

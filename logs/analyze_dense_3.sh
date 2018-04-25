@@ -10,18 +10,24 @@ fi
 
 self_com_1pplus_1="1,1"
 self_com_1pplus_2="10,10"
+self_com_1pplus_3="10,10"
 self_com_1p_1="na"
 self_com_1p_2="12,12"
+self_com_1p_3="12,12"
 pool_com_tt_1="0,2"
 pool_com_tt_2="12,5"
+pool_com_tt_3="12,5"
 pool_com_ntt_1="na"
 pool_com_ntt_2="na"
+pool_com_ntt_3="na"
 xpool_com_tt_1="3,10"
 xpool_com_tt_2="8,0"
+xpool_com_tt_3="8,0"
 xpool_com_ntt_1="0,11"
 xpool_com_ntt_2="5,3"
+xpool_com_ntt_3="5,3"
 
-declare -a com_types=($self_com_1pplus_1 $self_com_1pplus_2 $self_com_1p_1 $self_com_1p_2 $pool_com_tt_1 $pool_com_tt_2 $pool_com_ntt_1 $pool_com_ntt_2 $xpool_com_tt_1 $xpool_com_tt_2 $xpool_com_ntt_1 $xpool_com_ntt_2)
+declare -a com_types=($self_com_1pplus_1 $self_com_1pplus_2 $self_com_1pplus_3 $self_com_1p_1 $self_com_1p_2 $self_com_1p_3 $pool_com_tt_1 $pool_com_tt_2 $pool_com_tt_3 $pool_com_ntt_1 $pool_com_ntt_2 $pool_com_ntt_3 $xpool_com_tt_1 $xpool_com_tt_2 $xpool_com_tt_3 $xpool_com_ntt_1 $xpool_com_ntt_2 $xpool_com_ntt_3)
 
 echo $com_types
 
@@ -51,9 +57,11 @@ cat $file | grep "In Domain, Pool 1" | grep "Development Accuracy, both right, a
 join -t , temp_combined.txt temp.txt > tmp && mv tmp temp_combined.txt
 cat $file | grep "In Domain, Pool 2" | grep "Development Accuracy, both right, after comms:" | sed 's/.*Step: \([0-9]*\).*comms: \(.*\)/\1,\2/' > temp.txt
 join -t , temp_combined.txt temp.txt > tmp && mv tmp temp_combined.txt
+cat $file | grep "In Domain, Pool 3" | grep "Development Accuracy, both right, after comms:" | sed 's/.*Step: \([0-9]*\).*comms: \(.*\)/\1,\2/' > temp.txt
+join -t , temp_combined.txt temp.txt > tmp && mv tmp temp_combined.txt
 
 # Build output file
-echo "step,dummy,self_com_1p+_1,self_com_1p+_2,self_com_1p_1,self_com_1p_2,pool_com_tt_1,pool_com_tt_2,pool_com_ntt_1,pool_com_ntt_2,xpool_com_tt_1,xpool_com_tt_2,xpool_com_ntt_1,xpool_com_ntt_2,frozen1,frozen2" >> $output
+echo "step,dummy,self_com_1p+_1,self_com_1p+_2,self_com_1p+_3,self_com_1p_1,self_com_1p_2,self_com_1p_3,pool_com_tt_1,pool_com_tt_2,pool_com_tt_3,pool_com_ntt_1,pool_com_ntt_2,pool_com_ntt_3,xpool_com_tt_1,xpool_com_tt_2,xpool_com_tt_3,xpool_com_ntt_1,xpool_com_ntt_2,xpool_com_ntt_3,frozen1,frozen2,frozen3" >> $output
 
 cat temp_combined.txt >> $output
 cat $output

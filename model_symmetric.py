@@ -795,22 +795,25 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                                 debuglogger.info(f'Old target: {target[_]}')
                                 na, argmax_y1 = torch.max(y[0][-1], 1)
                                 na, argmax_y2 = torch.max(y[1][-1], 1)
+                                debuglogger.info(f'y1 logits: {y[0][-1].data}, y2 logits: {y[1][-1].data}')
                                 debuglogger.info(f'y1: {argmax_y1.data[0]}, y2: {argmax_y2.data[0]}, new_target: {new_target[0]}')
                                 if FLAGS.cuda:
                                     new_target = new_target.cuda()
                                 if change_agent == 1:
                                     # Calculate score for agent 2
                                     (dist_2_change, na, na, na, na, na) = get_classification_loss_and_stats(y[1][-1], new_target)
+                                    debuglogger.info(f'dist: {dist_2_change.data}')
                                     na, na, top_1_2_change = calculate_accuracy(
                                         dist_2_change, new_target, 1, FLAGS.top_k_dev)
                                     score = top_1_2_change
                                 else:
                                     # Calculate score for agent 1
                                     (dist_1_change, na, na, na, na, na) = get_classification_loss_and_stats(y[0][-1], new_target)
+                                    debuglogger.info(f'dist: {dist_1_change.data}')
                                     na, na, top_1_1_change = calculate_accuracy(
                                         dist_1_change, new_target, 1, FLAGS.top_k_dev)
                                     score = top_1_1_change
-                                debuglogger.info(f'i: New caption: {t}, new target: {_t}, change_agent: {change_agent}, correct: {score[0]}, originally correct: {correct_1[_]}/{correct_2[_]}')
+                                debuglogger.info(f'i: {_}_{_t}: New caption: {t}, new target: {_t}, change_agent: {change_agent}, correct: {score[0]}, originally correct: {correct_1[_]}/{correct_2[_]}')
 
                                 # Store results
                                 test_compositionality["total"] += 1
@@ -1942,6 +1945,13 @@ def run():
                 agent2 = agents[idx2]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx2 + 1)]
                 agent_idxs[1] = idx2 + 1
+            else:
+                # Training with just a pair of agents
+                agent1 = agents[0]
+                agent2 = agents[1]
+                optimizer_agent1 = optimizers_dict["optimizer_agent1"]
+                optimizer_agent2 = optimizers_dict["optimizer_agent2"]
+                agent_idxs = [1, 2]
 
             # Create a copy of agents playing with themselves to avoid sharing the hidden state
             if FLAGS.num_agents == 1 or (agent_idxs[0] == agent_idxs[1]):
@@ -2330,7 +2340,7 @@ def run():
                             else:
                                 # Report in domain development accuracy
                                 dev_accuracy_id_pairs[i], total_accuracy_com = get_and_log_dev_performance(
-                                    agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
+                                    _agent1, _agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id_pairs[i], logger, flogger, f'In Domain: Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'A_{i + 1}_{i + 2}')
 
                 # Report out of domain development accuracy
                 dev_accuracy_ood, total_accuracy_com = get_and_log_dev_performance(
@@ -2353,7 +2363,24 @@ def run():
             if (not FLAGS.agent_communities) and step % FLAGS.log_self_com == 0:
                 for i in range(FLAGS.num_agents):
                     agent1 = models_dict["agent" + str(i + 1)]
-                    agent2 = copy.deepcopy(agent1)
+                    # Create a copy of agents playing with themselves to avoid sharing the hidden state
+                    agent2 = Agent(im_feature_type=FLAGS.img_feat,
+                                           im_feat_dim=FLAGS.img_feat_dim,
+                                           h_dim=FLAGS.h_dim,
+                                           m_dim=FLAGS.m_dim,
+                                           desc_dim=FLAGS.desc_dim,
+                                           num_classes=FLAGS.num_classes,
+                                           s_dim=FLAGS.s_dim,
+                                           use_binary=FLAGS.use_binary,
+                                           use_attn=FLAGS.visual_attn,
+                                           attn_dim=FLAGS.attn_dim,
+                                           use_MLP=FLAGS.use_MLP,
+                                           cuda=FLAGS.cuda,
+                                           im_from_scratch=FLAGS.improc_from_scratch,
+                                           dropout=FLAGS.dropout)
+                    agent2.load_state_dict(agent1.state_dict())
+                    if FLAGS.cuda:
+                        agent2.cuda()
                     flogger.Log("Agent {} self communication: id {}".format(i + 1, id(agent)))
                     dev_accuracy_self_com[i], total_accuracy_com = get_and_log_dev_performance(
                         agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_self_com[i], logger, flogger, "Agent " + str(i + 1) + " self communication: In Domain", epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'self_com_A_{i + 1}')

@@ -1721,6 +1721,11 @@ def run():
 
     # Copy agents to measure how much the language has changed
     frozen_agents = copy.deepcopy(models_dict)
+    frozen_optimizers = copy.deepcopy(optimizers_dict)
+    if os.path.exists(FLAGS.checkpoint) and FLAGS.agent_communities:
+        # Load original agents into frozen agents so that self play comparison is with original agents
+        flogger.Log("Loading original agent pools into frozen agents")
+        torch_load_communities(FLAGS.community_checkpoints, num_agents_per_community, frozen_agents, frozen_optimizers)
 
     # GPU support
     if FLAGS.cuda:

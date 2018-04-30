@@ -33,7 +33,7 @@ from misc import build_mask
 
 from agents import Agent
 from dataset_loader import load_shapeworld_dataset
-from community_util import sample_agents, build_train_matrix, build_eval_list
+from community_util import sample_agents, build_train_matrix, build_eval_list, get_msg_pairs
 
 import gflags
 FLAGS = gflags.FLAGS
@@ -1822,6 +1822,25 @@ def run():
                     else:
                         # Report in domain development accuracy
                         dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
+        
+        elif FLAGS.gen_community_messages:
+            # Get list of agent pairs 
+            agent_pairs = get_msg_pairs(FLAGS.community_structure)
+            flogger.Log(f"Agent pairs to generate messages for: {agent_pairs}")
+            for (i, j) in agent_pairs:
+                flogger.Log("Agent 1: {}".format(i + 1))
+                logger.log(key="Agent 1: ", val=i + 1, step=step)
+                agent1 = models_dict["agent" + str(i + 1)]
+                flogger.Log("Agent 2: {}".format(j + 1))
+                logger.log(key="Agent 2: ", val=j + 1, step=step)
+                agent2 = models_dict["agent" + str(j + 1)]
+                
+                # Report in domain development accuracy
+                dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + i}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
+                
+                # Report out of domain development accuracy
+                dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
+        
         elif FLAGS.test_compositionality:
             # Load agent dictionaries
             code_dicts = []
@@ -1836,6 +1855,7 @@ def run():
                 logger.log(key="Agent 2: ", val=i + 2, step=step)
                 agent2 = models_dict["agent" + str(i + 2)]
                 dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 2}', agent_dicts=(code_dicts[i], code_dicts[i + 1]))
+        
         elif FLAGS.agent_communities:
             eval_community(eval_agent_list, models_dict, dev_accuracy_id[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
         else:
@@ -2532,6 +2552,8 @@ def flags():
     gflags.DEFINE_integer("num_communities", 2, "How many communities of agents")
     gflags.DEFINE_string("community_type", "dense", "Type of agent community: dense or hub_spoke")
     gflags.DEFINE_list("community_checkpoints", ['None', 'None'], "list of checkpoints per community")
+    gflags.DEFINE_boolean("gen_community_messages", False, "")
+    gflags.DEFINE_string("community_structure", "55555", "String listing the community structure")
     gflags.DEFINE_list("num_agents_per_community", [5, 5], "Number of agents per community. Specify one per community, can be different")
     gflags.DEFINE_list("intra_pool_connect_p", [1.0, 1.0], "Percentage of intra pool connectivity. Specify one value per community, can be different")
     gflags.DEFINE_float("inter_pool_connect_p", 0.1, "Percentage of inter pool connectvity. Specify one value")

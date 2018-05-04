@@ -8,18 +8,18 @@ if [ -f $output ]; then
   rm $output
 fi
 
-self_com_1pplus_1="1,1"
-self_com_1pplus_2="10,10"
+self_com_1pplus_1="0,0"
+self_com_1pplus_2="13,13"
 self_com_1p_1="na"
-self_com_1p_2="12,12"
-pool_com_tt_1="0,2"
-pool_com_tt_2="12,5"
+self_com_1p_2="na"
+pool_com_tt_1="2,7"
+pool_com_tt_2="10,9"
 pool_com_ntt_1="na"
 pool_com_ntt_2="na"
-xpool_com_tt_1="3,10"
-xpool_com_tt_2="8,0"
-xpool_com_ntt_1="0,11"
-xpool_com_ntt_2="5,3"
+xpool_com_tt_1="1,10"
+xpool_com_tt_2="18,3"
+xpool_com_ntt_1="8,14"
+xpool_com_ntt_2="14,1"
 
 declare -a com_types=($self_com_1pplus_1 $self_com_1pplus_2 $self_com_1p_1 $self_com_1p_2 $pool_com_tt_1 $pool_com_tt_2 $pool_com_ntt_1 $pool_com_ntt_2 $xpool_com_tt_1 $xpool_com_tt_2 $xpool_com_ntt_1 $xpool_com_ntt_2)
 

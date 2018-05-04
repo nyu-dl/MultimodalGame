@@ -1,31 +1,18 @@
 #!/bin/bash
 
 declare -a files=(
-pool10_11_msg_eval_only_A_1_2_message_stats.pkl 
-pool10_11_msg_eval_only_A_2_3_message_stats.pkl 
-pool10_11_msg_eval_only_A_3_4_message_stats.pkl 
-pool10_11_msg_eval_only_A_4_5_message_stats.pkl 
-pool10_11_msg_eval_only_A_5_6_message_stats.pkl 
-pool10_11_msg_eval_only_A_6_7_message_stats.pkl 
-pool10_11_msg_eval_only_A_7_8_message_stats.pkl 
-pool10_11_msg_eval_only_A_8_9_message_stats.pkl 
-pool10_11_msg_eval_only_A_9_10_message_stats.pkl 
-pool20_5_eval_eval_only_A_1_2_message_stats.pkl 
-pool20_5_eval_eval_only_A_2_3_message_stats.pkl 
-pool20_5_eval_eval_only_A_3_4_message_stats.pkl 
-pool20_5_eval_eval_only_A_4_5_message_stats.pkl 
-pool20_5_eval_eval_only_A_5_6_message_stats.pkl 
-pool30_5_eval_eval_only_A_1_2_message_stats.pkl 
-pool30_5_eval_eval_only_A_2_3_message_stats.pkl 
-pool30_5_eval_eval_only_A_3_4_message_stats.pkl 
-pool30_5_eval_eval_only_A_4_5_message_stats.pkl 
-pool4_5_eval_eval_only_A_1_2_message_stats.pkl 
-pool4_5_eval_eval_only_A_2_3_message_stats.pkl 
-pool4_5_eval_eval_only_A_3_4_message_stats.pkl 
-pool5_5_eval_eval_only_A_1_2_message_stats.pkl 
-pool5_5_eval_eval_only_A_2_3_message_stats.pkl 
-pool5_5_eval_eval_only_A_3_4_message_stats.pkl 
-pool5_5_eval_eval_only_A_4_5_message_stats.pkl 
+chains_msg/chain_331033_eval_only_A_1_17_message_stats.pkl
+chains_msg/chain_331033_eval_only_A_1_20_message_stats.pkl
+chains_msg/chain_331033_eval_only_A_1_2_message_stats.pkl
+chains_msg/chain_331033_eval_only_A_1_4_message_stats.pkl
+chains_msg/chain_331033_eval_only_A_1_7_message_stats.pkl
+chains_msg/chain_331033_eval_only_A_4_5_message_stats.pkl
+chains_msg/dense_331033_eval_only_A_1_17_message_stats.pkl
+chains_msg/dense_331033_eval_only_A_1_20_message_stats.pkl
+chains_msg/dense_331033_eval_only_A_1_2_message_stats.pkl
+chains_msg/dense_331033_eval_only_A_1_4_message_stats.pkl
+chains_msg/dense_331033_eval_only_A_1_7_message_stats.pkl
+chains_msg/dense_331033_eval_only_A_4_5_message_stats.pkl
 )
 
 for i in "${files[@]}"
@@ -33,4 +20,3 @@ do
   echo $i
   python ../../analyze_messages.py --path $i > $i.txt
 done
-

@@ -324,8 +324,9 @@ def run_analyze_messages(data, data_type, logger, flogger, epoch, step, i_batch)
 
 def add_data_point(batch, i, data_store, messages_1, messages_2, probs_1, probs_2):
     '''Adds the relevant data from a batch to a data store to analyze later'''
-    data_store["masked_im_1"].append(batch["masked_im_1"][i])
-    data_store["masked_im_2"].append(batch["masked_im_2"][i])
+    # Storing images creates a huge slowdown
+    #data_store["masked_im_1"].append(batch["masked_im_1"][i])
+    #data_store["masked_im_2"].append(batch["masked_im_2"][i])
     data_store["p"].append(batch["p"][i])
     data_store["target"].append(batch["target"][i])
     data_store["caption"].append(batch["caption_str"][i])
@@ -493,8 +494,11 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
         eval_mode = FLAGS.dataset_eval_mode
         debuglogger.info("Evaluating on out of domain validation set")
     dev_loader = load_shapeworld_dataset(dataset_path, FLAGS.glove_path, eval_mode, FLAGS.dataset_size_dev, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
-
+    
+    _batch_counter = 0
     for batch in dev_loader:
+        _batch_counter += 1
+        debuglogger.debug(f'Batch {_batch_counter}')
         target = batch["target"]
         im_feats_1 = batch["im_feats_1"]
         im_feats_2 = batch["im_feats_2"]
@@ -1940,6 +1944,7 @@ def run():
         
         elif FLAGS.agent_communities:
             eval_community(eval_agent_list, models_dict, dev_accuracy_id[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+        
         else:
             # For the pairs of agents calculate results
             # Applies to both pools of agents and an agent pair
@@ -1952,14 +1957,15 @@ def run():
                 agent2 = models_dict["agent" + str(i + 2)]
                 if i == 0:
                     # Report in domain development accuracy and analyze messages and store examples
-                    dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
+                    #dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
+                    dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
                 else:
                     # Report in domain development accuracy
                     dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
                         agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
 
                 # Report out of domain development accuracy
-                dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
+                dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_outdomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
 
             # Report in domain development accuracy when agents communicate with themselves
             for i in range(FLAGS.num_agents):

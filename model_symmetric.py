@@ -2058,6 +2058,13 @@ def run():
                 agent2 = agents[idx2]
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx2 + 1)]
                 agent_idxs[1] = idx2 + 1
+            elif FLAGS.num_agents == 1:
+                # Training with one agents
+                agent1 = agents[0]
+                agent2 = agents[0]
+                optimizer_agent1 = optimizers_dict["optimizer_agent1"]
+                optimizer_agent2 = optimizers_dict["optimizer_agent1"]
+                agent_idxs = [1, 1]
             else:
                 # Training with just a pair of agents
                 agent1 = agents[0]

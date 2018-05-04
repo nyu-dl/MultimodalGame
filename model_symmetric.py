@@ -33,13 +33,14 @@ from misc import build_mask
 
 from agents import Agent
 from dataset_loader import load_shapeworld_dataset
-from community_util import sample_agents, build_train_matrix, build_eval_list
+from community_util import sample_agents, build_train_matrix, build_eval_list, get_msg_pairs
 
 import gflags
 FLAGS = gflags.FLAGS
 
 SHAPES = ['circle', 'cross', 'ellipse', 'pentagon', 'rectangle', 'semicircle', 'square', 'triangle']
 COLORS = ['blue', 'cyan', 'gray', 'green', 'magenta', 'red', 'yellow']
+OOD_EXAMPLES = ['square_red', 'triangle_green', 'circle_blue', 'rectangle_yellow', 'cross_magenta', 'ellipse_cyan']
 MAX_EXAMPLES_TO_SAVE = 200
 
 
@@ -323,8 +324,9 @@ def run_analyze_messages(data, data_type, logger, flogger, epoch, step, i_batch)
 
 def add_data_point(batch, i, data_store, messages_1, messages_2, probs_1, probs_2):
     '''Adds the relevant data from a batch to a data store to analyze later'''
-    data_store["masked_im_1"].append(batch["masked_im_1"][i])
-    data_store["masked_im_2"].append(batch["masked_im_2"][i])
+    # Storing images creates a huge slowdown
+    #data_store["masked_im_1"].append(batch["masked_im_1"][i])
+    #data_store["masked_im_2"].append(batch["masked_im_2"][i])
     data_store["p"].append(batch["p"][i])
     data_store["target"].append(batch["target"][i])
     data_store["caption"].append(batch["caption_str"][i])
@@ -436,6 +438,13 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
     for c in COLORS:
         colors_accuracy[c] = {"correct": 0,
                               "total": 0}
+    
+    shapes_colors_accuracy = {}
+    for c in COLORS:
+        for s in SHAPES:
+            sc = s + '_'+ c
+            shapes_colors_accuracy[sc] = {"correct": 0,
+                                         "total": 0}
 
     # Keep track of agent specific performance (given other agent gets it both right)
     agent1_performance = {"11": 0,  # both right
@@ -485,8 +494,11 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
         eval_mode = FLAGS.dataset_eval_mode
         debuglogger.info("Evaluating on out of domain validation set")
     dev_loader = load_shapeworld_dataset(dataset_path, FLAGS.glove_path, eval_mode, FLAGS.dataset_size_dev, FLAGS.dataset_type, FLAGS.dataset_name, FLAGS.batch_size_dev, FLAGS.random_seed, FLAGS.shuffle_dev, FLAGS.img_feat, FLAGS.cuda, truncate_final_batch=False)
-
+    
+    _batch_counter = 0
     for batch in dev_loader:
+        _batch_counter += 1
+        debuglogger.debug(f'Batch {_batch_counter}')
         target = batch["target"]
         im_feats_1 = batch["im_feats_1"]
         im_feats_2 = batch["im_feats_2"]
@@ -660,8 +672,8 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 agent2_performance["10"] / agent2_performance["total"]))
 
         # Gather shape and color stats
-        correct_indices_nc = batch_correct_nc == 2
-        correct_indices_com = batch_correct_com == 2
+        correct_indices_nc = (batch_correct_nc == 2)
+        correct_indices_com = (batch_correct_com == 2)
         for _i in range(_batch_size):
             if batch['shapes'][_i] is not None:
                 shape = batch['shapes'][_i]
@@ -673,6 +685,13 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
                 colors_accuracy[color]["total"] += 1
                 if correct_indices_com[_i]:
                     colors_accuracy[color]["correct"] += 1
+            if (batch['colors'][_i] is not None) and (batch['shapes'][_i] is not None):
+                color = batch['colors'][_i]
+                shape = batch['shapes'][_i]
+                sc = shape + '_' + color
+                shapes_colors_accuracy[sc]["total"] += 1
+                if correct_indices_com[_i]:
+                    shapes_colors_accuracy[sc]["correct"] += 1
             # Time consuming, so only do this if necessary
             if store_examples or analyze_messages or save_messages:
                 # Store batch data to analyze
@@ -881,11 +900,13 @@ def eval_dev(dataset_path, top_k, agent1, agent2, logger, flogger, epoch, step, 
     extra['hamming_2_mean'] = hamming_2.mean()
     extra['shapes_accuracy'] = shapes_accuracy
     extra['colors_accuracy'] = colors_accuracy
+    extra['shapes_colors_accuracy'] = shapes_colors_accuracy
     extra['agent1_performance'] = agent1_performance
     extra['agent2_performance'] = agent2_performance
     extra['test_compositionality'] = test_compositionality
 
-    debuglogger.debug(f'Eval total size: {total}')
+    debuglogger.info(f'Eval total size: {total}')
+    debuglogger.info(f'Eval total correct com: {total_correct_com}')
     total_accuracy_nc = total_correct_nc / total
     total_accuracy_com = total_correct_com / total
     atleast1_accuracy_nc = atleast1_correct_nc / total
@@ -943,12 +964,31 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
     else:
         logger.log(key=domain + " Development Accuracy: Agent 1 given Agent 2 both right: 0 examples",
                    val=None, step=step)
+    
+    detail_total = 0
+    detail_correct = 0
     for k in extra['shapes_accuracy']:
         if extra['shapes_accuracy'][k]['total'] > 0:
             logger.log(key=domain + " Development Accuracy: " + k + " ", val=extra['shapes_accuracy'][k]['correct'] / extra['shapes_accuracy'][k]['total'], step=step)
+            detail_total += extra['shapes_accuracy'][k]['total']
+            detail_correct += extra['shapes_accuracy'][k]['correct']
+    logger.log(key=domain + " Development Accuracy: shapes ", val=detail_correct / detail_total, step=step)
+    detail_total = 0
+    detail_correct = 0
     for k in extra['colors_accuracy']:
         if extra['colors_accuracy'][k]['total'] > 0:
             logger.log(key=domain + " Development Accuracy: " + k + " ", val=extra['colors_accuracy'][k]['correct'] / extra['colors_accuracy'][k]['total'], step=step)
+            detail_total += extra['colors_accuracy'][k]['total']
+            detail_correct += extra['colors_accuracy'][k]['correct']
+    logger.log(key=domain + " Development Accuracy: colors ", val=detail_correct / detail_total, step=step)
+    detail_total = 0
+    detail_correct = 0
+    for k in extra['shapes_colors_accuracy']:
+        if extra['shapes_colors_accuracy'][k]['total'] > 0:
+            logger.log(key=domain + " Development Accuracy: " + k + " ", val=extra['shapes_colors_accuracy'][k]['correct'] / extra['shapes_colors_accuracy'][k]['total'], step=step)
+            detail_total += extra['shapes_colors_accuracy'][k]['total']
+            detail_correct += extra['shapes_colors_accuracy'][k]['correct']
+    logger.log(key=domain + " Development Accuracy: shapes_colors ", val=detail_correct / detail_total, step=step)
 
     flogger.Log("Epoch: {} Step: {} Batch: {} {} Development Accuracy, both right, no comms: {}".format(
         epoch, step, i_batch, domain, dev_accuracy_log['total_acc_both_nc'][-1]))
@@ -1004,6 +1044,8 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
             extra["agent2_performance"]["00"] / extra["agent2_performance"]["total"],
             extra["agent2_performance"]["10"] / extra["agent2_performance"]["total"]))
 
+    detail_total = 0
+    detail_correct = 0
     for k in extra['shapes_accuracy']:
         if extra['shapes_accuracy'][k]['total'] > 0:
             flogger.Log('{}: total: {}, correct: {}, accuracy: {}'.format(
@@ -1011,6 +1053,12 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
                 extra['shapes_accuracy'][k]['total'],
                 extra['shapes_accuracy'][k]['correct'],
                 extra['shapes_accuracy'][k]['correct'] / extra['shapes_accuracy'][k]['total']))
+            detail_total += extra['shapes_accuracy'][k]['total']
+            detail_correct += extra['shapes_accuracy'][k]['correct']
+    flogger.Log('{}: {}: total: {}, correct: {}, accuracy: {}'.format(
+                domain,'TOTAL SHAPES', detail_total, detail_correct, detail_correct / detail_total))
+    detail_total = 0
+    detail_correct = 0
     for k in extra['colors_accuracy']:
         if extra['colors_accuracy'][k]['total'] > 0:
             flogger.Log('{}: total: {}, correct: {}, accuracy: {}'.format(
@@ -1018,7 +1066,40 @@ def get_and_log_dev_performance(agent1, agent2, dataset_path, in_domain_eval, de
                 extra['colors_accuracy'][k]['total'],
                 extra['colors_accuracy'][k]['correct'],
                 extra['colors_accuracy'][k]['correct'] / extra['colors_accuracy'][k]['total']))
-
+            detail_total += extra['colors_accuracy'][k]['total']
+            detail_correct += extra['colors_accuracy'][k]['correct']
+    flogger.Log('{}: {}: total: {}, correct: {}, accuracy: {}'.format(
+                domain, 'TOTAL COLORS', detail_total, detail_correct, detail_correct / detail_total))
+    detail_total = 0
+    detail_correct = 0
+    ood_total = 0
+    ood_correct = 0
+    id_total = 0
+    id_correct = 0
+    for k in extra['shapes_colors_accuracy']:
+        if extra['shapes_colors_accuracy'][k]['total'] > 0:
+            flogger.Log('{}: total: {}, correct: {}, accuracy: {}'.format(
+                k,
+                extra['shapes_colors_accuracy'][k]['total'],
+                extra['shapes_colors_accuracy'][k]['correct'],
+                extra['shapes_colors_accuracy'][k]['correct'] / extra['shapes_colors_accuracy'][k]['total']))
+            detail_total += extra['shapes_colors_accuracy'][k]['total']
+            detail_correct += extra['shapes_colors_accuracy'][k]['correct']
+            if k in OOD_EXAMPLES:
+                ood_total += extra['shapes_colors_accuracy'][k]['total']
+                ood_correct += extra['shapes_colors_accuracy'][k]['correct']
+            else:
+                id_total += extra['shapes_colors_accuracy'][k]['total']
+                id_correct += extra['shapes_colors_accuracy'][k]['correct']
+    flogger.Log('{}: {}: total: {}, correct: {}, accuracy: {}'.format(
+                domain, 'TOTAL SHAPES_COLORS', detail_total, detail_correct, detail_correct / detail_total))
+    if id_total > 0:
+        flogger.Log('{}: {}: total: {}, correct: {}, accuracy: {}'.format(
+                domain, 'TOTAL SHAPES_COLORS in domain', id_total, id_correct, id_correct / id_total))
+    if ood_total > 0:
+        flogger.Log('{}: {}: total: {}, correct: {}, accuracy: {}'.format(
+                domain, 'TOTAL SHAPES_COLORS out of domain', ood_total, ood_correct, ood_correct / ood_total))
+    
     if agent_dicts is not None:
         flogger.Log('Test compositionality performance')
         comp_dict = {}
@@ -1818,10 +1899,34 @@ def run():
                             agent2.cuda()
                     if i == 0 and j == 0:
                         # Report in domain development accuracy and store examples
-                        dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
+                        dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
+                        # Report out of domain development accuracy and store examples
+                        dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_outdomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'Out of Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
                     else:
                         # Report in domain development accuracy
                         dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
+                        # Report out of domain development accuracy
+                        dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_outdomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'Out of Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
+        
+        
+        elif FLAGS.gen_community_messages:
+            # Get list of agent pairs 
+            agent_pairs = get_msg_pairs(FLAGS.community_structure)
+            flogger.Log(f"Agent pairs to generate messages for: {agent_pairs}")
+            for (i, j) in agent_pairs:
+                flogger.Log("Agent 1: {}".format(i + 1))
+                logger.log(key="Agent 1: ", val=i + 1, step=step)
+                agent1 = models_dict["agent" + str(i + 1)]
+                flogger.Log("Agent 2: {}".format(j + 1))
+                logger.log(key="Agent 2: ", val=j + 1, step=step)
+                agent2 = models_dict["agent" + str(j + 1)]
+                
+                # Report in domain development accuracy
+                dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{j + i}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{j + 1}')
+                
+                # Report out of domain development accuracy
+                dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{j + 1}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
+        
         elif FLAGS.test_compositionality:
             # Load agent dictionaries
             code_dicts = []
@@ -1836,8 +1941,10 @@ def run():
                 logger.log(key="Agent 2: ", val=i + 2, step=step)
                 agent2 = models_dict["agent" + str(i + 2)]
                 dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 2}', agent_dicts=(code_dicts[i], code_dicts[i + 1]))
+        
         elif FLAGS.agent_communities:
             eval_community(eval_agent_list, models_dict, dev_accuracy_id[0], logger, flogger, epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="no_tag")
+        
         else:
             # For the pairs of agents calculate results
             # Applies to both pools of agents and an agent pair
@@ -1850,14 +1957,15 @@ def run():
                 agent2 = models_dict["agent" + str(i + 2)]
                 if i == 0:
                     # Report in domain development accuracy and analyze messages and store examples
-                    dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
+                    #dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=True, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
+                    dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
                 else:
                     # Report in domain development accuracy
                     dev_accuracy_id[i], total_accuracy_com = get_and_log_dev_performance(
                         agent1, agent2, FLAGS.dataset_indomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'In Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=True, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
 
                 # Report out of domain development accuracy
-                dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_path, False, dev_accuracy_ood[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag="")
+                dev_accuracy_ood[i], total_accuracy_com = get_and_log_dev_performance(agent1, agent2, FLAGS.dataset_outdomain_valid_path, True, dev_accuracy_id[i], logger, flogger, f'Out of Domain Agents {i + 1},{i + 2}', epoch, step, i_batch, store_examples=False, analyze_messages=False, save_messages=False, agent_tag=f'eval_only_A_{i + 1}_{i + 2}')
 
             # Report in domain development accuracy when agents communicate with themselves
             for i in range(FLAGS.num_agents):
@@ -2500,6 +2608,8 @@ def flags():
         "dataset_path", "./Shapeworld/data/oneshape_simple_textselect", "Root directory of the dataset")
     gflags.DEFINE_string(
         "dataset_indomain_valid_path", "./Shapeworld/data/oneshape_valid/oneshape_simple_textselect", "Root directory of the in domain validation dataset")
+    gflags.DEFINE_string(
+        "dataset_outdomain_valid_path", "./Shapeworld/data/oneshape_valid_all_combos/oneshape_simple_textselect", "Root directory of the in domain validation dataset")
     gflags.DEFINE_string("dataset_mode", "train", "")
     gflags.DEFINE_enum("dataset_eval_mode", "validation",
                        ["validation", "test"], "")
@@ -2557,6 +2667,8 @@ def flags():
     gflags.DEFINE_integer("num_communities", 2, "How many communities of agents")
     gflags.DEFINE_string("community_type", "dense", "Type of agent community: dense or hub_spoke")
     gflags.DEFINE_list("community_checkpoints", ['None', 'None'], "list of checkpoints per community")
+    gflags.DEFINE_boolean("gen_community_messages", False, "")
+    gflags.DEFINE_string("community_structure", "55555", "String listing the community structure")
     gflags.DEFINE_list("num_agents_per_community", [5, 5], "Number of agents per community. Specify one per community, can be different")
     gflags.DEFINE_list("intra_pool_connect_p", [1.0, 1.0], "Percentage of intra pool connectivity. Specify one value per community, can be different")
     gflags.DEFINE_float("inter_pool_connect_p", 0.1, "Percentage of inter pool connectvity. Specify one value")

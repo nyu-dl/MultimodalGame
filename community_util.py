@@ -280,6 +280,21 @@ def build_eval_list(pools_num, community_type, train_vec_prob):
     debuglogger.info(f'Eval agent combinations: {agent_idxs}')
     return agent_idxs
 
+def get_msg_pairs(community_structure):
+    agent_pairs = []
+    if community_structure == "55555":
+        agent_pairs = [(0, 1), (0, 5), (0, 10), (0, 15), (0, 20), (5, 6), (5, 10), (5, 15), (5, 20), (10, 11), (10, 15), (10, 20), (15, 16), (15, 20), (20, 21)]
+    elif community_structure == "551055":
+        agent_pairs = [(0, 1), (0, 5), (0, 10), (0, 20), (0, 25), (5, 6), (5, 10), (5, 20), (5, 25), (10, 11), (10, 20), (20, 25), (20, 21), (20, 25), (25, 26)]
+    elif community_structure == "331033":
+        agent_pairs = [(0, 1), (0, 3), (0, 6), (0, 16), (0, 19), (3, 4), (3, 6), (3, 16), (3, 19), (6, 7), (6, 16), (6, 19), (16, 17), (16, 19), (19, 20)]
+    elif community_structure == "333710":
+        agent_pairs = [(0, 1), (0, 3), (0, 6), (0, 9), (0, 16), (3, 4), (3, 6), (3, 9), (3, 16), (6, 7), (6, 9), (6, 16), (9, 10), (9, 16), (16, 17)]
+    else:
+        print("ERROR: no agent pairs specified for " + community_structure) 
+        sys.exit()
+    return agent_pairs
+
 
 if __name__ == "__main__":
     pools_num = [5, 5, 5]

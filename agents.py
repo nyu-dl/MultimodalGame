@@ -232,7 +232,9 @@ class MessageProcessor(nn.Module):
         # Concatenate agent identifier with message
         bs = message.size(0)
         agent_identity = torch.zeros(bs, self.num_agents)
-        agent_identity[:, m_identifier] = 1
+        # -1 is the "blank message" option
+        if m_identifier != -1:
+            agent_identity[:, m_identifier] = 1
         if self.use_cuda:
             agent_identity = agent_identity.cuda()
         # debuglogger.info(f'Agent identifier: {agent_identity}')
@@ -456,7 +458,7 @@ class Agent(nn.Module):
     def forward(self, x, m, t, desc, use_message, batch_size, training, m_identifier):
         """
         Update State:
-            h_z = message_processor(m, h_z)
+            h_z = message_processor(m, h_z, m_identifier)
 
         Image processing
             h_i = image_processor(x, h_z)
@@ -618,7 +620,7 @@ if __name__ == "__main__":
     m = _Variable(torch.ones(batch_size, m_dim))
     desc = _Variable(torch.ones(batch_size, num_classes, desc_dim))
 
-    agent_identifier = 0
+    agent_identifier = -1
     for i in range(2):
         s, w, y, r = agent(x, m, i, desc, use_message, batch_size, training, agent_identifier)
         # print(f's_binary: {s[0]}')

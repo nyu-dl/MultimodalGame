@@ -318,6 +318,8 @@ class MessageGenerator(nn.Module):
             w_feats = w_binary
             # debuglogger.debug(f'w_binary: {w_binary}')
         else:
+            debuglogger.warn(f'Error: Training loop with real valued messages not implemented yet. Please set FLAGS.use_binary to true')
+            sys.exit()
             w_feats = w_scores
             w_probs = None
         # debuglogger.info(f'Message : {w_feats}')

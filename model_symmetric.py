@@ -1188,7 +1188,9 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
                                            use_MLP=FLAGS.use_MLP,
                                            cuda=FLAGS.cuda,
                                            im_from_scratch=FLAGS.improc_from_scratch,
-                                           dropout=FLAGS.dropout)
+                                           dropout=FLAGS.dropout,
+                                           identify_agents=FLAGS.identify_agents,
+                                           num_agents=FLAGS.num_agents)
                             agent2.load_state_dict(agent1.state_dict())
                             if FLAGS.cuda:
                                 agent2.cuda()
@@ -1218,7 +1220,9 @@ def eval_community(eval_list, models_dict, dev_accuracy_log, logger, flogger, ep
                                        use_MLP=FLAGS.use_MLP,
                                        cuda=FLAGS.cuda,
                                        im_from_scratch=FLAGS.improc_from_scratch,
-                                       dropout=FLAGS.dropout)
+                                       dropout=FLAGS.dropout,
+                                       identify_agents=FLAGS.identify_agents,
+                                       num_agents=FLAGS.num_agents)
                         agent2.load_state_dict(agent1.state_dict())
                         if FLAGS.cuda:
                             agent2.cuda()
@@ -1279,23 +1283,34 @@ def exchange(a1, a2, exchange_args):
     """
 
     # Randomly select which agent goes first
+    _a_idxs = exchange_args["agent_idxs"]
+    # Agent idxs matched to order of communication
+    agent_idxs = [None, None]
     who_goes_first = None
     if FLAGS.randomize_comms:
         if random.random() < 0.5:
             agent1 = a1
             agent2 = a2
+            agent_idxs[0] = _a_idxs[0]
+            agent_idxs[1] = _a_idxs[1]
             who_goes_first = 1
             debuglogger.debug(f'Agent 1 communicates first')
         else:
             agent1 = a2
             agent2 = a1
+            agent_idxs[0] = _a_idxs[1]
+            agent_idxs[1] = _a_idxs[0]
             who_goes_first = 2
             debuglogger.debug(f'Agent 2 communicates first')
     else:
         agent1 = a1
         agent2 = a2
+        agent_idxs[0] = _a_idxs[0]
+        agent_idxs[1] = _a_idxs[1]
         who_goes_first = 1
         debuglogger.debug(f'Agent 1 communicates first')
+    debuglogger.info(f'Original agent indices: {_a_idxs}')
+    debuglogger.info(f'Agent indices adjusted for comms order: {agent_idxs}')
 
     data = exchange_args["data"]
     # TODO extend implementation to include data context
@@ -1351,7 +1366,7 @@ def exchange(a1, a2, exchange_args):
         debuglogger.warning(f'Data context not supported currently')
         sys.exit()
     else:
-        # debuglogger.info(f'Inside exchange: Train status: {train}, Message: {m_binary}')
+        debuglogger.info(f'Inside exchange: Train status: {train}, Message: {m_binary}')
         s_1e, m_1e, y_1e, r_1e = agent1(
             data['im_feats_1'],
             m_binary,
@@ -1359,7 +1374,8 @@ def exchange(a1, a2, exchange_args):
             desc,
             use_message,
             batch_size,
-            train)
+            train,
+            -1)  # No agent identified since message is blank
 
         s_2e, m_2e, y_2e, r_2e = agent2(
             data['im_feats_2'],
@@ -1368,7 +1384,8 @@ def exchange(a1, a2, exchange_args):
             desc,
             use_message,
             batch_size,
-            train)
+            train,
+            -1)  # No agent identified since message is blank
 
     # Add no message selections to results
     # Need to be consistent about storing the a1 and a2's even though their roles are randomized during each exchange
@@ -1423,7 +1440,7 @@ def exchange(a1, a2, exchange_args):
             debuglogger.warning(f'Data context not supported currently')
             sys.exit()
         else:
-            # debuglogger.info(f'Inside exchange: Train status: {train}, Message to agent 2: {m_1e_binary}')
+            debuglogger.info(f'Inside exchange: Train status: {train}, Message to agent 2: {m_1e_binary}, other agent idx: {agent_idxs[0]}')
             s_2e, m_2e, y_2e, r_2e = agent2(
                 data['im_feats_2'],
                 m_1e_binary,
@@ -1431,7 +1448,8 @@ def exchange(a1, a2, exchange_args):
                 desc,
                 use_message,
                 batch_size,
-                train)
+                train,
+                agent_idxs[0])  # Agent 1 identifier
 
         # Agent 2's message
         m_2e_binary, m_2e_probs = m_2e
@@ -1465,7 +1483,7 @@ def exchange(a1, a2, exchange_args):
         if data_context is not None:
             pass
         else:
-            # debuglogger.info(f'Inside exchange: Train status: {train}, Message to agent 1: {m_2e_binary}')
+            # debuglogger.info(f'Inside exchange: Train status: {train}, Message to agent 1: {m_2e_binary}, other agent idx: {agent_idxs[1]}')
             s_1e, m_1e, y_1e, r_1e = agent1(
                 data['im_feats_1'],
                 m_2e_binary,
@@ -1473,7 +1491,8 @@ def exchange(a1, a2, exchange_args):
                 desc,
                 use_message,
                 batch_size,
-                train)
+                train,
+                agent_idxs[1])  # Agent 2 identifier
 
         # Store rest of communication and stop information
         s_binary_1, s_prob_1 = s_1e
@@ -1735,7 +1754,9 @@ def run():
                       use_MLP=FLAGS.use_MLP,
                       cuda=FLAGS.cuda,
                       im_from_scratch=FLAGS.improc_from_scratch,
-                      dropout=FLAGS.dropout)
+                      dropout=FLAGS.dropout,
+                      identify_agents=FLAGS.identify_agents,
+                      num_agents=FLAGS.num_agents)
 
         flogger.Log("Agent {} id: {} Architecture: {}".format(_ + 1, id(agent), agent))
         total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
@@ -1898,7 +1919,9 @@ def run():
                                        use_MLP=FLAGS.use_MLP,
                                        cuda=FLAGS.cuda,
                                        im_from_scratch=FLAGS.improc_from_scratch,
-                                       dropout=FLAGS.dropout)
+                                       dropout=FLAGS.dropout,
+                                       identify_agents=FLAGS.identify_agents,
+                                       num_agents=FLAGS.num_agents)
                         agent2.load_state_dict(agent1.state_dict())
                         if FLAGS.cuda:
                             agent2.cuda()
@@ -2041,7 +2064,7 @@ def run():
         for i_batch, batch in enumerate(dataloader):
             debuglogger.debug(f'Batch {i_batch}')
 
-            # Select agents if training with pools or communities
+            # Select agents
             if FLAGS.agent_pools:
                 idx = random.randint(0, len(agents) - 1)
                 agent1 = agents[idx]
@@ -2067,7 +2090,7 @@ def run():
                 optimizer_agent2 = optimizers_dict["optimizer_agent" + str(idx2 + 1)]
                 agent_idxs[1] = idx2 + 1
             elif FLAGS.num_agents == 1:
-                # Training with one agents
+                # Training with one agent
                 agent1 = agents[0]
                 agent2 = agents[0]
                 optimizer_agent1 = optimizers_dict["optimizer_agent1"]
@@ -2096,7 +2119,9 @@ def run():
                                use_MLP=FLAGS.use_MLP,
                                cuda=FLAGS.cuda,
                                im_from_scratch=FLAGS.improc_from_scratch,
-                               dropout=FLAGS.dropout)
+                               dropout=FLAGS.dropout,
+                               identify_agents=FLAGS.identify_agents,
+                               num_agents=FLAGS.num_agents)
                 agent2.load_state_dict(agent1.state_dict())
                 if FLAGS.cuda:
                     agent2.cuda()
@@ -2506,7 +2531,9 @@ def run():
                                    use_MLP=FLAGS.use_MLP,
                                    cuda=FLAGS.cuda,
                                    im_from_scratch=FLAGS.improc_from_scratch,
-                                   dropout=FLAGS.dropout)
+                                   dropout=FLAGS.dropout,
+                                   identify_agents=FLAGS.identify_agents,
+                                   num_agents=FLAGS.num_agents)
                     agent2.load_state_dict(agent1.state_dict())
                     if FLAGS.cuda:
                         agent2.cuda()
@@ -2674,6 +2701,8 @@ def flags():
                           "Whether to randomize the order in which agents communicate")
     gflags.DEFINE_boolean("cooperative_reward", False,
                           "Whether to have a cooperative or individual reward structure")
+    gflags.DEFINE_boolean("identify_agents", False,
+                          "Whether to give agents the identity of the message sender as an additional input")
     gflags.DEFINE_boolean("agent_pools", False,
                           "Whether to have a pool of agents to train instead of two fixed agents")
     gflags.DEFINE_integer("num_agents", 2, "How many agents total (single pool or community)")

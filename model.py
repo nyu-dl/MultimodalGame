@@ -5,6 +5,8 @@ import time
 import numpy as np
 import random
 import h5py
+import functools
+import logging
 
 import torch
 import torch.nn as nn
@@ -38,6 +40,10 @@ import gflags
 
 FLAGS = gflags.FLAGS
 
+FORMAT = '%(asctime)-15s %(message)s'
+logging.basicConfig(format=FORMAT)
+debuglogger = logging.getLogger('main_logger')
+debuglogger.setLevel(30)
 
 def Variable(*args, **kwargs):
     var = _Variable(*args, **kwargs)
@@ -192,7 +198,14 @@ class Sender(nn.Module):
         else:
             _x = x
 
+        debuglogger.info("=========================== SENDER FORWARD START ==================")
+        debuglogger.info('Sender input feat sizes...')
+        debuglogger.info(f'x: {x.size()}')
+        debuglogger.info(f'w: {w.size()}')
+        debuglogger.info(f'g: {g}')
+        debuglogger.info(f't: {t}')
         self.h_x = h_x = self.image_layer(_x)
+        debuglogger.info(f'h_x: {self.h_x.size()}')
         if t == 0:
             batch_size = x.size(0)
             # Same first code for all batch items.
@@ -205,6 +218,7 @@ class Sender(nn.Module):
             h_w = self.code_layer(code_mou).expand(batch_size, self.h_dim)
         else:
             h_w = self.code_layer(w)
+        debuglogger.info(f'h_w: {h_w.size()}')
         if FLAGS.ignore_code:
             if FLAGS.sender_mix == "sum" or FLAGS.sender_mix == "prod":
                 features = self.binary_layer(F.tanh(h_x))
@@ -219,6 +233,7 @@ class Sender(nn.Module):
             elif FLAGS.sender_mix == "mou":
                 features = self.binary_layer(
                     F.tanh(torch.cat([h_x, h_w, h_x - h_w, h_x * h_w], 1)))
+        debuglogger.info(f'features: {features.size()}')
         if self.use_binary:
             probs = F.sigmoid(features)
             if self.training:
@@ -233,6 +248,9 @@ class Sender(nn.Module):
             if FLAGS.flipout_sen is not None and (self.training or FLAGS.flipout_dev):
                 binary_features = flipout(binary_features, FLAGS.flipout_sen)
 
+            debuglogger.info(f'binary features: {binary_features.size()}')
+            debuglogger.info(f'probs: {probs.size()}')
+            debuglogger.info("=========================== SENDER FORWARD END ==================")
             return binary_features, probs
         else:
             return features, None
@@ -328,6 +346,12 @@ class Receiver(nn.Module):
                 message is binary, then the probability of each bit in the message being ``1`` is included.
             y: A prediction for each class described in the descriptions.
         """
+        debuglogger.info("=================== RECEIVER FORWARD START ======================")
+        debuglogger.info("receiver input sizes...")
+        debuglogger.info(f'z: {z.size()}')
+        debuglogger.info(f'desc: {desc.size()}')
+        debuglogger.info(f'desc set: {desc_set.size()}')
+        debuglogger.info(f'desc set size: len: {len(desc_set_lens)} vals:  {desc_set_lens}')
 
         # BatchSize x BinaryDim
         batch_size, binary_dim = z.size()
@@ -338,7 +362,8 @@ class Receiver(nn.Module):
 
         # Run z through RNN
         self.h_z = self.rnn(z, self.h_z)
-
+        
+        debuglogger.info(f'h_z: {self.h_z.size()}')
         # Build input for prediction using descriptions
         # size of inp_with_desc: B*D x (WV+h)
         if FLAGS.desc_attn:
@@ -410,54 +435,67 @@ class Receiver(nn.Module):
                 [weighted_desc, h_z_flat], 1)  # B*D x (WV+h)
         else:
             inp_with_desc = build_inp(self.h_z, desc)  # B*D x (WV+h)
+        debuglogger.info(f'inp_with_desc: {inp_with_desc.size()}')
 
         s_score = self.s(self.h_z)
         s_prob = F.sigmoid(s_score)
+        debuglogger.debug(f'stop score: {s_score}, s_prob: {s_prob}')
         if self.training:
             # Sample decisions
             prob_ = s_prob.data.cpu().numpy()
+            debuglogger.debug(f'stop probs:\n {prob_}')
             s_binary = Variable(torch.from_numpy(
                 (np.random.rand(*prob_.shape) < prob_).astype('float32')))
         else:
             # Infer decisions
-            if not self.s_prob_prod or not FLAGS.s_prob_prod:
+            if self.s_prob_prod is None or not FLAGS.s_prob_prod:
                 self.s_prob_prod = s_prob
             else:
                 self.s_prob_prod = self.s_prob_prod * s_prob
             s_binary = torch.round(self.s_prob_prod).detach()
+        debuglogger.debug(f'stop decisions: {s_binary}')
         if s_prob.is_cuda:
             s_binary = s_binary.cuda()
 
         # Obtain predictions
         y = self.y1(inp_with_desc).clamp(min=0)
         y = self.y2(y).view(batch_size, -1)
-
+        debuglogger.info(f'class predictions: {y.size()}')
         # Obtain communications
         # size of y = batch_size x # descriptions
         # size of desc = # descriptions x self.desc_dim
         # size of wd_inp = batch_size x self.desc_dim
         n_desc = y.size(1)
         # Reweight descriptions based on current model confidence
-        y_scores = F.softmax(y).detach()
+        y_scores = F.softmax(y, dim=1).detach()
+        debuglogger.info(f'class scores: {y_scores.size()}')
         y_broadcast = y_scores.unsqueeze(2).expand(
             batch_size, n_desc, self.desc_dim)
+        debuglogger.info(f'class scores broadcast: {y_broadcast.size()}')
         if FLAGS.desc_attn:
             wd_inp = weighted_desc.view(batch_size, nclasses, self.desc_dim)
         else:
             wd_inp = desc.unsqueeze(0).expand(
                 batch_size, n_desc, self.desc_dim)
+        debuglogger.info(f'wd_inp: {wd_inp.size()}')
         wd_inp = (y_broadcast * wd_inp).sum(1).squeeze(1)
+        debuglogger.info(f'wd_inp: {wd_inp.size()}')
 
         # Hidden state for Receiver message
         self.h_w = F.tanh(self.w_h(self.h_z) + self.w_d(wd_inp))
-
+        debuglogger.info(f'h_w: {self.h_w.size()}')
+        
         w_scores = self.w(self.h_w)
+        debuglogger.info(f'w_scores: {w_scores.size()}')
         if self.use_binary:
             w_probs = F.sigmoid(w_scores)
+            debuglogger.info(f'w_probs: {w_probs.size()}')
             if self.training:
                 probs_ = w_probs.data.cpu().numpy()
+                debuglogger.info(f'probs: {probs_.shape}')
                 w_binary = Variable(torch.from_numpy(
                     (np.random.rand(*probs_.shape) < probs_).astype('float32')))
+                debuglogger.info(f'w_binary: {w_binary.size()}')
             else:
                 w_binary = torch.round(w_probs).detach()
             if w_probs.is_cuda:
@@ -473,6 +511,8 @@ class Receiver(nn.Module):
         else:
             w_feats = w_scores
             w_probs = None
+        
+        debuglogger.info("=================== RECEIVER FORWARD END ======================")
 
         return (s_binary, s_prob), (w_feats, w_probs), y
 
@@ -525,29 +565,38 @@ def build_inp(binary_features, descs):
     Output:
         b_cat_d: The cartesian product of binary features and descriptions, length ``B`` x ``D``.
     """
+    debuglogger.info("=========== BUILD INP START ================")
     if descs is not None:
         batch_size = binary_features.size(0)
         num_desc, desc_dim = descs.size()
 
         # Expand binary features.
+        debuglogger.info(f'binary features {len(binary_features)}')
+        debuglogger.info(f'descs: {len(descs)}')
         binary_index = torch.from_numpy(
             np.arange(batch_size).repeat(num_desc).astype(np.int32)).long()
+        debuglogger.info(f'binary index {binary_index.size()}')
         if binary_features.is_cuda:
             binary_index = binary_index.cuda()
         binary_copied = torch.index_select(
             binary_features, 0, Variable(binary_index))
 
+        debuglogger.info(f'binary copied {binary_copied.size()}')
         # Expand descriptions.
         desc_index = torch.from_numpy(np.concatenate(
             [np.arange(num_desc)] * batch_size).astype(np.int32)).long()
         if descs.is_cuda:
             desc_index = desc_index.cuda()
+        debuglogger.info(f'desc index: {desc_index.size()}')
         desc_copied = torch.index_select(descs, 0, Variable(desc_index))
-
+        debuglogger.info(f'desc copied: {desc_copied.size()}')
         # Concat binary vector with description vectors
         inp = torch.cat([binary_copied, desc_copied], 1)
+        debuglogger.info(f'inp: {inp.size()}')
+        debuglogger.info("=========== BUILD INP END ================")
         return inp
     else:
+        debuglogger.info("=========== BUILD INP END ================")
         return binary_features
 
 
@@ -654,7 +703,7 @@ def eval_dev(dev_file, batch_size, epoch, shuffle, cuda, top_k,
         outp, _ = get_rec_outp(y, y_masks)
 
         # Obtain top k predictions
-        dist = F.log_softmax(outp)
+        dist = F.log_softmax(outp, dim=1)
         top_k_ind = torch.from_numpy(
             dist.data.cpu().numpy().argsort()[:, -top_k:]).long()
         target = target.view(-1, 1).expand(_batch_size, top_k)
@@ -799,7 +848,7 @@ def exchange(sender, receiver, baseline_sen, baseline_rec, exchange_args):
     receiver.reset_state()
 
     for i_exchange in range(FLAGS.max_exchange):
-
+        debuglogger.info(f' ================== EXCHANGE {i_exchange} ====================')
         z_r = w_binary  # rename variable to z_r which makes more sense
 
         # Run data through Sender
@@ -835,7 +884,7 @@ def exchange(sender, receiver, baseline_sen, baseline_rec, exchange_args):
             baseline_sen_scores = baseline_sen(
                 Variable(sen_h_x.data), Variable(z_r.data), None)
 
-            rec_h_z = receiver.h_z if receiver.h_z else receiver.initial_state(
+            rec_h_z = receiver.h_z if receiver.h_z is not None  else receiver.initial_state(
                 batch_size)
 
             # Score from Baseline (Receiver)
@@ -845,7 +894,7 @@ def exchange(sender, receiver, baseline_sen, baseline_rec, exchange_args):
         outp = outp.view(batch_size, -1)
 
         # Obtain predictions
-        dist = F.log_softmax(outp)
+        dist = F.log_softmax(outp, dim=1)
         maxdist, argmax = dist.data.max(1)
 
         # Save for later
@@ -878,12 +927,13 @@ def exchange(sender, receiver, baseline_sen, baseline_rec, exchange_args):
 
 def get_rec_outp(y, masks):
     def negent(yy):
-        probs = F.softmax(yy)
+        probs = F.softmax(yy, dim=1)
         return (torch.log(probs + 1e-8) * probs).sum(1).mean()
 
     # TODO: This is wrong for the dynamic exchange, and we might want a "per example"
     # entropy for either exchange (this version is mean across batch).
-    negentropy = map(negent, y)
+    negentropy = list(map(negent, y))
+    debuglogger.info(f'negentropy type: {type(negentropy)}')
 
     if masks is not None:
 
@@ -1023,7 +1073,7 @@ def run():
                     attn_context_dim=FLAGS.attn_context_dim)
 
     flogger.Log("Architecture: {}".format(sender))
-    total_params = sum([reduce(lambda x, y: x * y, p.size(), 1.0)
+    total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
                         for p in sender.parameters()])
     flogger.Log("Total Parameters: {}".format(total_params))
 
@@ -1034,7 +1084,7 @@ def run():
                             inp_dim=0)
 
     flogger.Log("Architecture: {}".format(baseline_sen))
-    total_params = sum([reduce(lambda x, y: x * y, p.size(), 1.0)
+    total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
                         for p in baseline_sen.parameters()])
     flogger.Log("Total Parameters: {}".format(total_params))
 
@@ -1048,7 +1098,7 @@ def run():
                         use_binary=FLAGS.use_binary)
 
     flogger.Log("Architecture: {}".format(receiver))
-    total_params = sum([reduce(lambda x, y: x * y, p.size(), 1.0)
+    total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
                         for p in receiver.parameters()])
     flogger.Log("Total Parameters: {}".format(total_params))
 
@@ -1059,7 +1109,7 @@ def run():
                             inp_dim=FLAGS.rec_hidden)
 
     flogger.Log("Architecture: {}".format(baseline_rec))
-    total_params = sum([reduce(lambda x, y: x * y, p.size(), 1.0)
+    total_params = sum([functools.reduce(lambda x, y: x * y, p.size(), 1.0)
                         for p in baseline_rec.parameters()])
     flogger.Log("Total Parameters: {}".format(total_params))
 
@@ -1264,8 +1314,11 @@ def run():
             outp, ent_y_rec = get_rec_outp(y, y_masks)
 
             # Obtain predictions
-            dist = F.log_softmax(outp)
+            debuglogger.info(f'outp: {outp.size()}')
+            dist = F.log_softmax(outp, dim=1)
+            debuglogger.info(f'dist: {dist.size()}')
             maxdist, argmax = dist.data.max(1)
+            debuglogger.debug(f'maxdist: {maxdist}, argmax: {argmax}')
 
             # Receiver classification loss
             nll_loss = nn.NLLLoss()(dist, Variable(target))
@@ -1585,9 +1638,11 @@ def run():
 
             # Increment batch step
             step += 1
+            #break
 
         # Increment epoch
         epoch += 1
+        #break
 
     flogger.Log("Finished training.")
 
@@ -1816,5 +1871,7 @@ if __name__ == '__main__':
     FLAGS(sys.argv)
 
     default_flags()
-
+    
+    print(sys.argv)
+    
     run()

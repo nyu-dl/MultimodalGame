@@ -1,71 +1,64 @@
 # MultimodalGame
 
-Source code for [Emergent Communication in a Multi-Modal, Multi-Step Referential Game](https://arxiv.org/abs/1705.10369).
+## Installing
+
+git clone --recurse-submodules https://github.com/lgraesser/MultimodalGame.git
 
 ## Dependencies
 
-- Python2.7
+- Python3
 - Pytorch
+- scikit-image
 
 You should install Pytorch using instructions from [here](http://pytorch.org/). Otherwise, can install dependencies using pip: `pip install -r requirements.txt`
 
 ## Building the Datasets
 
-This model requires an hdf5 file containing image features and csv file containing class descriptions. To build such a dataset using images from Imagenet, you can simply run the following script:
+This model used ShapeWorld datasets. To generate a demo dataset run the following command.
 
 ```
-cd ./utils
-bash build_datasets.sh
+mkdir data
+cd ShapeWorld
+./build_datasets.sh
+cd ..
 ```
 
-This will download image urls from Imagenet (~300mb compressed), save urls from 30 classes, split them into train/dev/test, download the relevant images, extract the necessary features using a pretrained ResNet-34, and build the descriptions file.
-
-This model also depends on pretrained word embeddings. We recommend using the `6B.100d` GloVe embeddings availabe [here](https://nlp.stanford.edu/projects/glove/).
+This model also depends on pretrained word embeddings. We recommend using the `6B.100d` GloVe embeddings available [here](https://nlp.stanford.edu/projects/glove/).
 
 ## Running the Code
 
-Here is an example command for running the agents in an "Adaptive" setting, where the Receiver has the option to terminate the conversation and make a prediction before the maximum number of exchange steps have been exhausted.
+Here is an example command for running the agents in a "Fixed" setting. Alternatively run the following command to train this model.
 
 ```
-python model.py \
--experiment_name demo \ # used to save various log files
--exchange_samples 5 \ # print samples of the communication
--model_type Adaptive \ # the receiver will determine when to stop the conversation
--max_exchange 10 \ # max number of exchange steps in the agents' conversation
--batch_size 64 \
--rec_w_dim 32 \ # message dimension of the receiver (this should match the sender)
--sender_out_dim 32 \ # message dimension of the sender (this should match the receiver)
--img_h_dim 256 \ # hidden dimension of the sender
--rec_hidden 64 \ # hidden dimension of the receiver
--learning_rate 1e-4 \ # learning rate for gradient descent
--entropy_rec 0.01 \ # regularize the receiver's messages
--entropy_sen 0.01 \ # regularize the sender's messages
--entropy_s 0.08 \ # regularize the stop bit 
--use_binary \ # specify binary communication (continuous values are also an option)
--max_epoch 500 \ # number of epochs to train
--top_k_dev 6 \ # specify tok-k for dev
--top_k_train 6 \ # specify top-k for train
--descr_train ./utils/descriptions.csv \
--descr_dev ./utils/descriptions.csv \
--train_file ./utils/train.hdf5 \
--dev_file ./utils/dev.hdf5 \
--wv_dim 100 \ # dimension of word vector
--glove_path ~/data/glove/glove.6B.100d.txt
+mkdir logs
+./run.sh
 ```
 
-## Message Analysis
-
-After training a model, it's desirable to examine the binary messages used in the communication between the Sender and Receiver. These can be retrieved with a command along the lines of the following:
-
 ```
-EXPERIMENT_NAME="demo"; \
-    python model.py \
-    -log_load ./logs/${EXPERIMENT_NAME}.json \ # load model configuration from here
-    -binary_only \ # specify to only extract binary messages (`eval_only` is also an option)
-    -experiment_name demo-binary \ # write output to a log file different from training
-    -checkpoint ./logs/${EXPERIMENT_NAME}.pt_best \ # load this checkpoint
-    -binary_output ./logs/${EXPERIMENT_NAME}.bv.hdf5 \ # save messages as an hdf5
-    -fixed_exchange # use `fixed_exchange` since the adaptive length can be determined with the stop bits
+python model_symmetric.py \
+-experiment_name test_training \
+-exchange_samples 0 \
+-model_type Fixed \
+-max_exchange 1 \
+-batch_size 8 \
+-batch_size_dev 8 \
+-m_dim 50 \
+-h_dim 100 \
+-desc_dim 100 \
+-num_classes 10 \
+-learning_rate 1e-4 \
+-entropy_agent1 0.01 \
+-entropy_agent2 0.01 \
+-use_binary \
+-max_epoch 100 \
+-top_k_dev 1 \
+-top_k_train 1 \
+-dataset_path ./data/oneshape_simple_textselect \
+-dataset_name oneshape_simple_textselect \
+-dataset_size_train 250 \
+-dataset_size_dev 100  \
+-wv_dim 100 \
+-glove_path ./glove.6B/glove.6B.100d.txt \
+-log_path ./logs \
+-debug_log_level INFO
 ```
-
-We've included a notebook with a couple examples for how you might want to analyse the binary messages [here](https://github.com/nyu-dl/MultimodalGame/blob/master/analyse_communication.ipynb).

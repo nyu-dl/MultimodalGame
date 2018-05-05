@@ -11,11 +11,18 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import string
 import itertools
+import logging
 
 try:
     from visdom import Visdom
 except:
     pass
+
+
+FORMAT = '[%(asctime)s %(levelname)s] %(message)s'
+logging.basicConfig(format=FORMAT)
+debuglogger = logging.getLogger('main_logger')
+debuglogger.setLevel('DEBUG')
 
 
 """
@@ -90,6 +97,33 @@ def torch_load(filename, models_dict, optimizers_dict):
         v.load_state_dict(checkpoint['optimizers'][k])
 
     return checkpoint['data']
+
+
+def torch_load_communities(filenames, num_agents_per_community, models_dict, optimizers_dict):
+    offset = 0
+    # TODO - check this works with trained agents
+    for f, num in zip(filenames, num_agents_per_community):
+        if f != 'None':
+            filename = os.path.expanduser(f)
+            if not os.path.exists(filename):
+                raise Exception("File does not exist: " + filename)
+
+            checkpoint = torch.load(filename)
+            data = checkpoint['data']
+            for i in range(num):
+                i_0 = i + offset
+                key_0 = "agent" + str(i_0 + 1)
+                key = "agent" + str(i + 1)
+                debuglogger.info(f'Loading agents {key_0}/{key} from checkpoint {f}')
+                models_dict[key_0].load_state_dict(checkpoint['models'][key])
+                key_0 = "optimizer_agent" + str(i_0 + 1)
+                key = "optimizer_agent" + str(i + 1)
+                optimizers_dict[key_0].load_state_dict(checkpoint['optimizers'][key])
+            debuglogger.info(f'Loaded agents {offset + 1} - {offset + num} from checkpoint {f}')
+            debuglogger.info(f'Loaded at step {data["step"]} and best dev acc {data["best_dev_acc"]}')
+        else:
+            debuglogger.info(f'No checkpoint given for agents {offset + 1} - {offset + num}, training from scratch...')
+        offset += num
 
 
 class VisdomLogger(object):
@@ -263,7 +297,7 @@ def load_hdf5(hdf5_file, batch_size, random_seed, shuffle, truncate_final_batch=
     target = f["Target"]
     dataset_size = target.shape[0]
     f.close()
-    order = range(dataset_size)
+    order = list(range(dataset_size))
 
     # Shuffle
     if shuffle:
@@ -287,8 +321,9 @@ def load_hdf5(hdf5_file, batch_size, random_seed, shuffle, truncate_final_batch=
 
         # TODO: We probably need to map the label_ids some way.
         batch['target'] = torch.LongTensor(
-            map(map_labels, f["Target"][batch_indices]))
-        batch['example_ids'] = f["Location"][batch_indices]
+            list(map(map_labels, f["Target"][batch_indices])))
+        # Location format broken in hdf5 in python 3
+        # batch['example_ids'] = f["Location"][batch_indices]
 
         batch['layer4_2'] = torch.from_numpy(
             f["layer4_2"][batch_indices]).float().squeeze()
@@ -323,7 +358,7 @@ def embed(word_dict, emb):
 # Function computing CBOW for each description
 def cbow(descr, word_dict):
     # TODO: Faster summing please!
-    emb_size = len(word_dict.values()[0]["emb"])
+    emb_size = len(list(word_dict.values())[0]["emb"])
     for mammal in descr:
         num_w = 0
         desc_len = len(descr[mammal]["desc"])
@@ -338,6 +373,38 @@ def cbow(descr, word_dict):
         descr[mammal]["cbow"] = desc_cbow
         descr[mammal]["set"] = desc_set
     return descr
+
+
+# Function computing CBOW for each set of descriptions
+def cbow_general(texts, word2id, id2word):
+    '''Takes a batch of n texts per example. Each example is a list of ints corresponding to a textual description of the image
+    Returns: two tensors.
+                1. cbow vector for each example
+                    size: batch_size x desc_per_elem x embedding_dim
+                2. individual word vectors for each example
+                    size: batch_size x desc_per_elem x max_description_length x embedding_dim
+                    sentences shorter than max_length are 0 padded at the end'''
+    emb_size = len(list(word2id.values())[1]["emb"])
+    desc_per_eg = len(texts[0])
+    max_len = max([max([len(e) for e in t]) for t in texts])  # max length of sentence
+    debuglogger.debug(f'batch_size: {len(texts)}, desc per eg: {desc_per_eg}, emb size: {emb_size}, max len: {max_len}')
+    desc_set = torch.FloatTensor(len(texts), desc_per_eg, max_len, emb_size).fill_(0)
+    desc_set_lens = torch.FloatTensor(len(texts), desc_per_eg).fill_(0)
+    desc_cbow = torch.FloatTensor(len(texts), desc_per_eg, emb_size).fill_(0)
+    for i_t, t in enumerate(texts):
+        for i_e, e in enumerate(t):
+            num_w = 0
+            for i_w, w in enumerate(e):
+                if word2id[id2word[w]]["emb"] is not None:
+                    desc_set[i_t, i_e, i_w, :] = word2id[id2word[w]]["emb"]
+                    num_w += 1
+            desc_cbow[i_t, i_e] = desc_set[i_t, i_e, :, :].sum(0).squeeze()
+            if num_w > 0:
+                desc_cbow[i_t, i_e] /= num_w
+            desc_set_lens[i_t, i_e] = num_w
+    # debuglogger.debug(f'cbow: {desc_cbow}')
+    # debuglogger.debug(f'lens: {desc_set_lens}')
+    return desc_cbow, desc_set, desc_set_lens
 
 
 """
